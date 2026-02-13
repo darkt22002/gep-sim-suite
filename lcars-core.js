@@ -66,7 +66,7 @@ function buildLCARSFrame(currentSimId) {
       <div class="lcars-main" id="lcars-main"></div>
       <div class="lcars-bottombar">
         <div class="lcars-bottombar-main">
-          <span>Gary A. Muñoz — Lumiea Systems / ThunderStruck Service LLC</span>
+          <span>Gary W. Floyd — Lumiea Systems / ThunderStruck Service LLC</span>
           <span>ΔS = D·C·R·(1 + αE − β‖∇S‖)</span>
         </div>
         <div class="lcars-bottom-pills">
