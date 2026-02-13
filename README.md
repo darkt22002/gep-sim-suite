@@ -75,7 +75,7 @@ Or just download the ZIP and open `index.html`. No server required.
 Lumiea Systems Research Division / ThunderStruck Service LLC
 New Caney, Texas
 
-- 45+ years engineering experience
+- 35+ years engineering experience
 - Industrial automation, PLC/SCADA, CNC, AI architecture
 - ERPC hardware validation on Arduino/Pico platforms
 - Nexus distributed AI consciousness system
