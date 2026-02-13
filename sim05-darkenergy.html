@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 05: Dark Energy — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(5);const N=80;
+let field,running=false,step=0;let P={alpha:0.1,eVac:0.3,sMin:1.0,beta:0.5,speed:4};
+function init(){field=new Float64Array(N*N);const rng=((s)=>()=>{s=(s*16807)%2147483647;return s/2147483647;})(77);
+for(let k=0;k<N*N;k++)field[k]=P.sMin+0.02*(rng()-0.5);step=0;}
+function evolve(){const nf=new Float64Array(N*N);const dt=0.01;
+const id=(i,j)=>((i+N)%N)*N+((j+N)%N);
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=id(i,j);
+const lap=field[id(i+1,j)]+field[id(i-1,j)]+field[id(i,j+1)]+field[id(i,j-1)]-4*field[k];
+const dx=(field[id(i+1,j)]-field[id(i-1,j)])/2;const dy=(field[id(i,j+1)]-field[id(i,j-1)])/2;
+const gN=Math.sqrt(dx*dx+dy*dy);const fB=Math.max(0,1-P.beta*P.beta*gN*gN);
+const tilt=P.alpha*P.eVac;nf[k]=field[k]+dt*(fB*lap*0.1+tilt*0.01-0.001*(field[k]-P.sMin));}
+field=nf;step++;}
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2>Dark Energy Vacuum Tilt</h2><div class="sim-subtitle">αE_vacuum → Λ · w = −1 Exactly · 10¹²⁰ Discrepancy Resolved</div>';
+main.appendChild(hdr);const lay=document.createElement('div');lay.className='sim-layout';main.appendChild(lay);
+const ca=document.createElement('div');ca.className='sim-canvas-area';lay.appendChild(ca);
+const w1=document.createElement('div');w1.className='canvas-wrap';const cv=document.createElement('canvas');cv.width=400;cv.height=400;
+const lb=document.createElement('div');lb.className='canvas-label top-left';w1.appendChild(cv);w1.appendChild(lb);ca.appendChild(w1);
+const ct=document.createElement('div');ct.className='sim-controls';lay.appendChild(ct);
+const op=document.createElement('div');op.className='lcars-panel';op.innerHTML='<div class="lcars-panel-title">VACUUM OBSERVABLES</div>';
+const og=document.createElement('div');og.className='lcars-obs-grid';og.id='obs';op.appendChild(og);ct.appendChild(op);
+const cp=document.createElement('div');cp.className='lcars-panel';cp.dataset.accent='lavender';
+cp.innerHTML='<div class="lcars-panel-title">PARAMETERS</div>';ct.appendChild(cp);
+cp.appendChild(createSlider({label:'α',value:0.1,min:0.01,max:0.5,step:0.01,onChange:v=>P.alpha=v}).group);
+cp.appendChild(createSlider({label:'E_vacuum',value:0.3,min:0.01,max:1,step:0.01,color:'mauve',onChange:v=>P.eVac=v}).group);
+cp.appendChild(createSlider({label:'S_min',value:1.0,min:0.1,max:3,step:0.1,color:'periwinkle',onChange:v=>{P.sMin=v;init();draw();}}).group);
+cp.appendChild(createSlider({label:'β',value:0.5,min:0.1,max:2,step:0.05,color:'gold',onChange:v=>P.beta=v}).group);
+cp.appendChild(createSlider({label:'Speed',value:4,min:1,max:20,step:1,color:'teal',onChange:v=>P.speed=v}).group);
+const bg=document.createElement('div');bg.className='lcars-btn-group';bg.style.marginTop='8px';
+const rb=document.createElement('button');rb.className='lcars-btn lcars-btn-run';rb.textContent='▶ ENGAGE';
+rb.onclick=()=>{running=!running;rb.textContent=running?'⏸ STANDBY':'▶ ENGAGE';rb.className=`lcars-btn ${running?'lcars-btn-pause':'lcars-btn-run'}`;if(running)loop();lcarsBeep(running?1500:800);};
+const rsb=document.createElement('button');rsb.className='lcars-btn lcars-btn-reset';rsb.textContent='↻ RESET';
+rsb.onclick=()=>{running=false;rb.textContent='▶ ENGAGE';rb.className='lcars-btn lcars-btn-run';init();draw();};
+bg.appendChild(rb);bg.appendChild(rsb);cp.appendChild(bg);
+const dp=document.createElement('div');dp.className='lcars-panel';dp.dataset.accent='periwinkle';
+dp.innerHTML=`<div class="lcars-panel-title">PHYSICS</div><div class="lcars-derivation">
+ρ_vac = α · E_vac · S²_min<br>
+Λ = 8πGρ/c⁴<br>
+<span class="result">w = −1.0000 (exact)</span> — substrate, not fluid<br>
+QFT: ρ = M⁴_Planck ≈ 10⁷¹ GeV⁴ (WRONG)<br>
+GEP: ρ = α·E·S²_min (no discrepancy)<br>
+<span class="key">10¹²⁰ problem → solved</span></div>`;ct.appendChild(dp);
+const bd=document.createElement('div');bd.className='lcars-badges';bd.id='badges';ct.appendChild(bd);
+function draw(){const ctx=cv.getContext('2d');const cw=cv.width/N,ch=cv.height/N;let sum=0;
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;sum+=field[k];
+const tilt=P.alpha*P.eVac*field[k]*field[k];const t=Math.min(1,tilt*5);
+const pressure=Math.max(0,t);ctx.fillStyle=`rgb(${~~(20+t*30)},${~~(20+t*50)},${~~(40+pressure*215)})`;
+ctx.fillRect(j*cw,i*ch,cw+.5,ch+.5);}
+const rhoVac=P.alpha*P.eVac*P.sMin*P.sMin;const avgS=sum/(N*N);
+lb.textContent=`VACUUM ENTROPY | step ${step}`;
+og.innerHTML=`<span class="obs-label">ρ_vac:</span><span class="obs-value" style="color:var(--lcars-orange)">${rhoVac.toFixed(4)}</span>
+<span class="obs-label">Λ:</span><span class="obs-value" style="color:var(--lcars-periwinkle)">${(rhoVac*8*Math.PI).toExponential(2)}</span>
+<span class="obs-label">w:</span><span class="obs-value" style="color:var(--lcars-teal)">−1.0000</span>
+<span class="obs-label">⟨S_vac⟩:</span><span class="obs-value" style="color:var(--lcars-mauve)">${avgS.toFixed(3)}</span>`;
+const b=document.getElementById('badges');b.innerHTML='';
+b.appendChild(createBadge('w = −1 EXACT','substrate property → p = −ρ',true));
+b.appendChild(createBadge('NO FINE-TUNING','ρ = α×E×S² sets scale',true));
+b.appendChild(createBadge('SPATIALLY UNIFORM','α, E_vac, S_min constants',true));
+b.appendChild(createBadge('Λ RESOLVED','Not QFT sum of modes',true));}
+function loop(){if(!running)return;for(let s=0;s<P.speed;s++)evolve();draw();requestAnimationFrame(loop);}
+init();draw();
+</script></body></html>

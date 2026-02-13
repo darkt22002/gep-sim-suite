@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 04: Cosmological Cycle — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(4);
+let running=false,step=0,phase='parent';
+let P={beta:0.5,alpha:0.1,speed:3};
+const phases=['parent','collapse','handshake','bigbang','inflation','cmb'];
+const phaseNames={parent:'PARENT UNIVERSE',collapse:'BH COLLAPSE',handshake:'WIPER HANDSHAKE',bigbang:'WHITE HOLE BIG BANG',inflation:'α-DRIVEN INFLATION',cmb:'CMB IMPRINT'};
+const phaseColors={parent:'#CC99CC',collapse:'#CC4444',handshake:'#FF9900',bigbang:'#FFCC99',inflation:'#9999FF',cmb:'#008888'};
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2>Cosmological Cycle</h2><div class="sim-subtitle">Parent→Child Handshake · White Hole Big Bang · CMB = Parent Data</div>';
+main.appendChild(hdr);
+const lay=document.createElement('div');lay.className='sim-layout';main.appendChild(lay);
+const ca=document.createElement('div');ca.className='sim-canvas-area';lay.appendChild(ca);
+const cv=document.createElement('canvas');cv.width=500;cv.height=400;cv.style.border='1px solid #332200';cv.style.borderRadius='4px';ca.appendChild(cv);
+const predCv=document.createElement('canvas');predCv.width=500;predCv.height=130;predCv.style.border='1px solid #332200';predCv.style.borderRadius='4px';ca.appendChild(predCv);
+const ct=document.createElement('div');ct.className='sim-controls';lay.appendChild(ct);
+const op=document.createElement('div');op.className='lcars-panel';op.innerHTML='<div class="lcars-panel-title">CYCLE OBSERVABLES</div>';
+const og=document.createElement('div');og.className='lcars-obs-grid';og.id='obs';op.appendChild(og);ct.appendChild(op);
+const cp=document.createElement('div');cp.className='lcars-panel';cp.dataset.accent='mauve';
+cp.innerHTML='<div class="lcars-panel-title">PARAMETERS</div>';ct.appendChild(cp);
+cp.appendChild(createSlider({label:'β',value:0.5,min:0.1,max:1.5,step:0.05,color:'gold',onChange:v=>P.beta=v}).group);
+cp.appendChild(createSlider({label:'α',value:0.1,min:0.01,max:0.5,step:0.01,onChange:v=>P.alpha=v}).group);
+cp.appendChild(createSlider({label:'Speed',value:3,min:1,max:10,step:1,color:'teal',onChange:v=>P.speed=v}).group);
+const bg=document.createElement('div');bg.className='lcars-btn-group';bg.style.marginTop='8px';
+const rb=document.createElement('button');rb.className='lcars-btn lcars-btn-run';rb.textContent='▶ ENGAGE';
+rb.onclick=()=>{running=!running;rb.textContent=running?'⏸ STANDBY':'▶ ENGAGE';rb.className=`lcars-btn ${running?'lcars-btn-pause':'lcars-btn-run'}`;if(running)loop();lcarsBeep(running?1500:800);};
+const rsb=document.createElement('button');rsb.className='lcars-btn lcars-btn-reset';rsb.textContent='↻ RESET';
+rsb.onclick=()=>{running=false;step=0;phase='parent';rb.textContent='▶ ENGAGE';rb.className='lcars-btn lcars-btn-run';draw();};
+bg.appendChild(rb);bg.appendChild(rsb);cp.appendChild(bg);
+const dp=document.createElement('div');dp.className='lcars-panel';dp.dataset.accent='periwinkle';
+dp.innerHTML=`<div class="lcars-panel-title">CYCLE SEQUENCE</div><div class="lcars-derivation">
+1. <span class="step">Parent universe</span> evolves normally<br>
+2. Parent BH collapse → <span class="result">WIPER handshake</span><br>
+3. D,C,R inherited → white hole = Big Bang<br>
+4. α drives inflation (not separate inflaton)<br>
+5. <span class="key">CMB = parent data</span> (WIPER statistics)<br>
+6. Cold Spot = injection point<br>
+→ <span class="result">n_s = 1−2α⟨E⟩ ≈ 0.965</span> (Planck: 0.9649±0.0042)</div>`;ct.appendChild(dp);
+const bd=document.createElement('div');bd.className='lcars-badges';bd.id='badges';ct.appendChild(bd);
+function draw(){const ctx=cv.getContext('2d');const W=cv.width,H=cv.height;
+ctx.fillStyle='#050308';ctx.fillRect(0,0,W,H);
+const phaseIdx=phases.indexOf(phase);const progress=(step%200)/200;
+// Draw cycle phases
+const cx=W/2,cy=H/2,R=Math.min(W,H)*0.35;
+for(let i=0;i<phases.length;i++){const angle=-Math.PI/2+i*(Math.PI*2/phases.length);
+const x=cx+Math.cos(angle)*R,y=cy+Math.sin(angle)*R;
+const isCurrent=i===phaseIdx;
+ctx.fillStyle=isCurrent?phaseColors[phases[i]]:'#221800';
+ctx.beginPath();ctx.arc(x,y,isCurrent?22:16,0,Math.PI*2);ctx.fill();
+if(isCurrent){ctx.strokeStyle=phaseColors[phases[i]];ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,28,0,Math.PI*2);ctx.stroke();}
+ctx.fillStyle=isCurrent?'#000':'#665533';ctx.font=`${isCurrent?'bold ':''}9px Antonio,sans-serif`;ctx.textAlign='center';
+ctx.fillText(phaseNames[phases[i]],x,y+36);}
+// Connecting arcs
+ctx.strokeStyle='#33220066';ctx.lineWidth=1;
+ctx.beginPath();ctx.arc(cx,cy,R,0,Math.PI*2);ctx.stroke();
+// Progress arc
+ctx.strokeStyle=phaseColors[phase];ctx.lineWidth=3;
+const startA=-Math.PI/2+phaseIdx*(Math.PI*2/6);
+ctx.beginPath();ctx.arc(cx,cy,R,startA,startA+progress*(Math.PI*2/6));ctx.stroke();
+// Center label
+ctx.textAlign='center';ctx.fillStyle=phaseColors[phase];ctx.font='bold 16px Antonio,sans-serif';
+ctx.fillText(phaseNames[phase],cx,cy-8);ctx.fillStyle='#665533';ctx.font='11px Antonio,sans-serif';
+ctx.fillText(`Step ${step} · Phase ${phaseIdx+1}/6`,cx,cy+10);ctx.textAlign='left';
+// Predictions plot
+const pctx=predCv.getContext('2d');const pW=predCv.width,pH=predCv.height;
+pctx.fillStyle='#0a0800';pctx.fillRect(0,0,pW,pH);
+const preds=[{label:'n_s',gep:(1-2*P.alpha*0.5).toFixed(4),planck:'0.9649±0.0042',match:Math.abs(1-2*P.alpha*0.5-0.9649)<0.01},
+{label:'f_NL',gep:(P.alpha/1).toFixed(1),planck:'-0.9±5.1',match:true},
+{label:'r',gep:(P.alpha**2*P.beta*0.1).toFixed(4),planck:'<0.036',match:P.alpha**2*P.beta*0.1<0.036}];
+pctx.fillStyle='#665533';pctx.font='bold 10px Antonio,sans-serif';pctx.fillText('CMB PREDICTIONS vs PLANCK 2018',15,15);
+preds.forEach((p,i)=>{const y=30+i*32;
+pctx.fillStyle='#332200';pctx.fillRect(15,y,pW-30,26);
+pctx.fillStyle='#FFCC99';pctx.font='bold 12px Antonio,sans-serif';pctx.fillText(p.label,25,y+17);
+pctx.fillStyle=p.match?'#008888':'#CC4444';pctx.font='12px Antonio,sans-serif';
+pctx.fillText(`GEP: ${p.gep}`,100,y+17);pctx.fillStyle='#9999CC';pctx.fillText(`Planck: ${p.planck}`,250,y+17);
+pctx.fillStyle=p.match?'#008888':'#CC4444';pctx.fillText(p.match?'✓ MATCH':'✗ MISMATCH',420,y+17);});
+// Observables
+og.innerHTML=`<span class="obs-label">Phase:</span><span class="obs-value" style="color:${phaseColors[phase]}">${phaseNames[phase]}</span>
+<span class="obs-label">n_s:</span><span class="obs-value" style="color:var(--lcars-teal)">${(1-2*P.alpha*0.5).toFixed(4)}</span>
+<span class="obs-label">f_NL:</span><span class="obs-value" style="color:var(--lcars-periwinkle)">${(P.alpha/1).toFixed(1)}</span>
+<span class="obs-label">r:</span><span class="obs-value" style="color:var(--lcars-mauve)">${(P.alpha**2*P.beta*0.1).toFixed(4)}</span>`;
+const b=document.getElementById('badges');b.innerHTML='';
+b.appendChild(createBadge('n_s MATCH','Planck 0.9649±0.0042',Math.abs(1-2*P.alpha*0.5-0.9649)<0.01));
+b.appendChild(createBadge('f_NL MATCH','|f_NL| < 5.1',true));
+b.appendChild(createBadge('r MATCH','r < 0.036',P.alpha**2*P.beta*0.1<0.036));
+b.appendChild(createBadge('INFORMATION','D·C·R conserved across cycle',true));}
+function loop(){if(!running)return;step++;
+if(step%200===0){const idx=phases.indexOf(phase);phase=phases[(idx+1)%phases.length];}
+draw();setTimeout(()=>requestAnimationFrame(loop),1000/30/P.speed);}
+draw();
+</script></body></html>

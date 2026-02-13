@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEP 01: Higgs Sector SSB — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css">
+<script src="lcars-core.js"></script>
+</head>
+<body>
+<script>
+const main = buildLCARSFrame(1);
+const N = 80;
+
+// State
+let field = new Float64Array(N * N);
+let velocity = new Float64Array(N * N);
+let running = false, step = 0, animId = null;
+let params = { beta: 0.5, alpha: 0.1, mu2: -1.0, lambda: 0.5, speed: 4, view: 'field' };
+
+function init() {
+  const rng = ((s) => () => { s = (s * 16807) % 2147483647; return s / 2147483647; })(42);
+  for (let i = 0; i < N * N; i++) {
+    field[i] = 0.3 * (rng() - 0.5);
+    velocity[i] = 0;
+  }
+  step = 0;
+}
+
+function evolve() {
+  const { beta, mu2, lambda } = params;
+  const nf = new Float64Array(N * N);
+  const nv = new Float64Array(N * N);
+  const dt = 0.015;
+  const id = (i, j) => ((i + N) % N) * N + ((j + N) % N);
+
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const k = id(i, j);
+      const lap = field[id(i+1,j)] + field[id(i-1,j)] + field[id(i,j+1)] + field[id(i,j-1)] - 4 * field[k];
+      const dx = (field[id(i+1,j)] - field[id(i-1,j)]) / 2;
+      const dy = (field[id(i,j+1)] - field[id(i,j-1)]) / 2;
+      const gradNorm = Math.sqrt(dx*dx + dy*dy);
+      const fBeta = Math.max(0, 1 - beta * beta * gradNorm * gradNorm);
+      // V'(φ) = μ²φ + λφ³
+      const dV = mu2 * field[k] + lambda * field[k] * field[k] * field[k];
+      const force = fBeta * lap - dV - 0.05 * velocity[k];
+      nv[k] = velocity[k] + dt * force;
+      nf[k] = field[k] + dt * nv[k];
+    }
+  }
+  field = nf;
+  velocity = nv;
+  step++;
+}
+
+// Build UI
+const header = document.createElement('div');
+header.className = 'sim-header';
+header.innerHTML = `
+  <h2>Higgs Sector SSB</h2>
+  <div class="sim-subtitle">Mexican Hat Potential → VEV Emergence → Mass Generation</div>
+  <div class="sim-author">ΔS = D·C·R·(1 + αE − β‖∇S‖) → V(φ) = μ²φ²/2 + λφ⁴/4</div>
+`;
+main.appendChild(header);
+
+const layout = document.createElement('div');
+layout.className = 'sim-layout';
+main.appendChild(layout);
+
+// Canvas area
+const canvasArea = document.createElement('div');
+canvasArea.className = 'sim-canvas-area';
+layout.appendChild(canvasArea);
+
+const wrap1 = document.createElement('div');
+wrap1.className = 'canvas-wrap';
+const canvas = document.createElement('canvas');
+canvas.width = 400; canvas.height = 400;
+const label1 = document.createElement('div');
+label1.className = 'canvas-label top-left';
+label1.textContent = 'HIGGS FIELD φ(x,y) | step 0';
+wrap1.appendChild(canvas);
+wrap1.appendChild(label1);
+canvasArea.appendChild(wrap1);
+
+// Potential canvas
+const potCanvas = document.createElement('canvas');
+potCanvas.width = 400; potCanvas.height = 120;
+potCanvas.style.border = '1px solid #332200';
+potCanvas.style.borderRadius = '4px';
+canvasArea.appendChild(potCanvas);
+
+// Controls
+const controls = document.createElement('div');
+controls.className = 'sim-controls';
+layout.appendChild(controls);
+
+// Observables panel
+const obsPanel = document.createElement('div');
+obsPanel.className = 'lcars-panel';
+obsPanel.innerHTML = `<div class="lcars-panel-title">HIGGS OBSERVABLES</div>`;
+const obsGrid = document.createElement('div');
+obsGrid.className = 'lcars-obs-grid';
+obsGrid.id = 'obs-grid';
+obsPanel.appendChild(obsGrid);
+controls.appendChild(obsPanel);
+
+// Controls panel
+const ctrlPanel = document.createElement('div');
+ctrlPanel.className = 'lcars-panel';
+ctrlPanel.dataset.accent = 'mauve';
+ctrlPanel.innerHTML = `<div class="lcars-panel-title">PARAMETERS</div>`;
+controls.appendChild(ctrlPanel);
+
+const betaSlider = createSlider({ label: 'β', value: 0.5, min: 0.05, max: 2, step: 0.05, color: 'gold',
+  detail: 'UV cutoff: 1/β = 2.0', detailId: 'beta-detail',
+  onChange: (v) => { params.beta = v; document.getElementById('beta-detail').textContent = `UV cutoff: 1/β = ${(1/v).toFixed(1)}`; }
+});
+ctrlPanel.appendChild(betaSlider.group);
+
+const mu2Slider = createSlider({ label: 'μ²', value: -1.0, min: -3, max: 1, step: 0.1,
+  detail: 'μ² < 0 → SSB', onChange: (v) => params.mu2 = v
+});
+ctrlPanel.appendChild(mu2Slider.group);
+
+const lamSlider = createSlider({ label: 'λ', value: 0.5, min: 0.1, max: 2, step: 0.1, color: 'rose',
+  detail: 'Self-coupling', onChange: (v) => params.lambda = v
+});
+ctrlPanel.appendChild(lamSlider.group);
+
+const speedSlider = createSlider({ label: 'Speed', value: 4, min: 1, max: 20, step: 1, color: 'teal',
+  onChange: (v) => params.speed = v
+});
+ctrlPanel.appendChild(speedSlider.group);
+
+// View buttons
+const viewLabel = document.createElement('div');
+viewLabel.className = 'lcars-slider-label';
+viewLabel.innerHTML = '<span>View Mode</span>';
+ctrlPanel.appendChild(viewLabel);
+ctrlPanel.appendChild(createViewButtons(['field', 'potential', 'gradient'], 'field', (m) => { params.view = m; draw(); }));
+
+// Run/Reset buttons
+const btnGroup = document.createElement('div');
+btnGroup.className = 'lcars-btn-group';
+btnGroup.style.marginTop = '8px';
+const runBtn = document.createElement('button');
+runBtn.className = 'lcars-btn lcars-btn-run';
+runBtn.textContent = '▶ ENGAGE';
+runBtn.onclick = () => {
+  running = !running;
+  runBtn.textContent = running ? '⏸ STANDBY' : '▶ ENGAGE';
+  runBtn.className = `lcars-btn ${running ? 'lcars-btn-pause' : 'lcars-btn-run'}`;
+  if (running) loop();
+  lcarsBeep(running ? 1500 : 800);
+};
+const resetBtn = document.createElement('button');
+resetBtn.className = 'lcars-btn lcars-btn-reset';
+resetBtn.textContent = '↻ RESET';
+resetBtn.onclick = () => { running = false; runBtn.textContent = '▶ ENGAGE'; runBtn.className = 'lcars-btn lcars-btn-run'; init(); draw(); lcarsBeep(600); };
+btnGroup.appendChild(runBtn);
+btnGroup.appendChild(resetBtn);
+ctrlPanel.appendChild(btnGroup);
+
+// Derivation panel
+const derivPanel = document.createElement('div');
+derivPanel.className = 'lcars-panel';
+derivPanel.dataset.accent = 'periwinkle';
+derivPanel.innerHTML = `
+  <div class="lcars-panel-title">DERIVATION CHAIN</div>
+  <div class="lcars-derivation">
+    <span class="step">Entropy field φ(x)</span> with self-interaction<br>
+    <span class="step">V(φ) = ½μ²φ² + ¼λφ⁴</span><br>
+    μ² < 0 → <span class="result">spontaneous symmetry breaking</span><br>
+    VEV: ⟨φ⟩ = √(−μ²/λ) ≡ v<br>
+    Expand φ = v + h(x):<br>
+    → <span class="key">Higgs boson h</span> (radial mode, massive)<br>
+    → <span class="key">Goldstone modes</span> (angular, massless)<br>
+    β-damping → <span class="result">UV finite mass generation</span>
+  </div>
+`;
+controls.appendChild(derivPanel);
+
+// Badges
+const badges = document.createElement('div');
+badges.className = 'lcars-badges';
+badges.id = 'badges';
+controls.appendChild(badges);
+
+// Draw functions
+function draw() {
+  const ctx = canvas.getContext('2d');
+  const cw = canvas.width / N, ch = canvas.height / N;
+  let sum = 0, sum2 = 0, maxGrad = 0;
+
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const k = i * N + j;
+      const v = field[k];
+      sum += v; sum2 += v * v;
+      const dx = (field[((i+1)%N)*N+j] - field[((i-1+N)%N)*N+j]) / 2;
+      const dy = (field[i*N+(j+1)%N] - field[i*N+(j-1+N)%N]) / 2;
+      const g = Math.sqrt(dx*dx + dy*dy);
+      if (g > maxGrad) maxGrad = g;
+
+      if (params.view === 'field') {
+        const t = (v + 2) / 4;
+        const r = t < 0.5 ? ~~(t * 2 * 100) : ~~(200 + (t - 0.5) * 2 * 55);
+        const b2 = t < 0.5 ? ~~(200 - t * 2 * 200) : ~~(0);
+        const g2 = t < 0.5 ? ~~(50 + t * 100) : ~~(100 + (t - 0.5) * 2 * 100);
+        ctx.fillStyle = `rgb(${r},${g2},${b2})`;
+      } else if (params.view === 'potential') {
+        const pot = 0.5 * params.mu2 * v * v + 0.25 * params.lambda * v * v * v * v;
+        const t = Math.min(1, Math.max(0, (pot + 1) / 3));
+        ctx.fillStyle = `rgb(${~~(t*255)},${~~(50+t*100)},${~~(20+t*30)})`;
+      } else {
+        const fB = Math.max(0, 1 - params.beta**2 * g * g);
+        ctx.fillStyle = `rgb(${~~((1-fB)*255)},${~~(fB*200)},${~~(40+fB*80)})`;
+      }
+      ctx.fillRect(j * cw, i * ch, cw + 0.5, ch + 0.5);
+    }
+  }
+
+  const avg = sum / (N * N);
+  const vev = Math.sqrt(-params.mu2 / params.lambda);
+  const mH = Math.sqrt(-2 * params.mu2);
+  label1.textContent = `${params.view.toUpperCase()} | step ${step}`;
+
+  // Update observables
+  obsGrid.innerHTML = `
+    <span class="obs-label">⟨φ⟩:</span><span class="obs-value" style="color:var(--lcars-orange)">${avg.toFixed(3)}</span>
+    <span class="obs-label">VEV (theory):</span><span class="obs-value" style="color:var(--lcars-teal)">${params.mu2 < 0 ? '±' + vev.toFixed(3) : 'N/A'}</span>
+    <span class="obs-label">m_H:</span><span class="obs-value" style="color:var(--lcars-mauve)">${params.mu2 < 0 ? mH.toFixed(3) : '0'}</span>
+    <span class="obs-label">β|∇φ|_max:</span><span class="obs-value" style="color:${params.beta*maxGrad<1?'var(--lcars-teal)':'var(--lcars-red)'}">${(params.beta*maxGrad).toFixed(3)}</span>
+  `;
+
+  // Update badges
+  badges.innerHTML = '';
+  badges.appendChild(createBadge('SSB', params.mu2 < 0 ? 'μ² < 0 → broken' : 'μ² ≥ 0 → unbroken', params.mu2 < 0));
+  badges.appendChild(createBadge('VEV FORMED', `|⟨φ⟩| = ${Math.abs(avg).toFixed(2)}`, Math.abs(avg) > vev * 0.3));
+  badges.appendChild(createBadge('β-BOUNDED', `max β|∇φ| = ${(params.beta*maxGrad).toFixed(2)}`, params.beta * maxGrad < 1.1));
+  badges.appendChild(createBadge('MASS GAP', `m_H = ${mH.toFixed(2)}`, params.mu2 < 0));
+
+  drawPotential();
+}
+
+function drawPotential() {
+  const ctx = potCanvas.getContext('2d');
+  const W = potCanvas.width, H = potCanvas.height;
+  ctx.fillStyle = '#0a0800';
+  ctx.fillRect(0, 0, W, H);
+
+  const pad = { l: 40, r: 20, t: 15, b: 20 };
+  const pW = W - pad.l - pad.r, pH = H - pad.t - pad.b;
+  const phiMax = 3;
+  const toX = (phi) => pad.l + ((phi + phiMax) / (2 * phiMax)) * pW;
+
+  // Potential curve
+  const { mu2, lambda } = params;
+  let vMax = 0;
+  for (let px = 0; px < pW; px++) {
+    const phi = (px / pW) * 2 * phiMax - phiMax;
+    const V = 0.5 * mu2 * phi * phi + 0.25 * lambda * phi * phi * phi * phi;
+    if (Math.abs(V) > vMax) vMax = Math.abs(V);
+  }
+  vMax = Math.max(vMax, 0.5);
+  const toY = (V) => pad.t + (1 - (V / vMax + 1) / 2) * pH;
+
+  ctx.strokeStyle = '#332200';
+  ctx.lineWidth = 0.5;
+  const midY = toY(0);
+  ctx.beginPath(); ctx.moveTo(pad.l, midY); ctx.lineTo(W - pad.r, midY); ctx.stroke();
+
+  ctx.strokeStyle = '#FF9900';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let px = 0; px < pW; px++) {
+    const phi = (px / pW) * 2 * phiMax - phiMax;
+    const V = 0.5 * mu2 * phi * phi + 0.25 * lambda * phi * phi * phi * phi;
+    const y = toY(V);
+    px === 0 ? ctx.moveTo(pad.l + px, y) : ctx.lineTo(pad.l + px, y);
+  }
+  ctx.stroke();
+
+  // VEV markers
+  if (mu2 < 0) {
+    const vev = Math.sqrt(-mu2 / lambda);
+    for (const v of [-vev, vev]) {
+      const vx = toX(v);
+      ctx.fillStyle = '#00888888';
+      ctx.beginPath();
+      ctx.arc(vx, toY(0.5 * mu2 * v * v + 0.25 * lambda * v * v * v * v), 4, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.fillStyle = '#665533';
+  ctx.font = '9px Antonio, sans-serif';
+  ctx.fillText('V(φ) = ½μ²φ² + ¼λφ⁴', pad.l + 5, pad.t + 10);
+  ctx.fillText('φ', W / 2, H - 3);
+}
+
+function loop() {
+  if (!running) return;
+  for (let s = 0; s < params.speed; s++) evolve();
+  draw();
+  animId = requestAnimationFrame(loop);
+}
+
+init();
+draw();
+</script>
+</body>
+</html>

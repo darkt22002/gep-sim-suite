@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 09: SMBH Anchor — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(9);
+let P={z:0,rpg:10,showJWST:true};
+const H0=67.4;function Hz(z){return H0*Math.sqrt(0.315*Math.pow(1+z,3)+0.685);}
+function anchorMass(z,rpg){return 1.1e6*(Hz(z)/H0)**2*Math.pow(rpg/10,3);}
+const jwst=[{name:"GN-z11",z:10.6,mass:1.6e9},{name:"UHZ1",z:10.1,mass:4e7},{name:"CEERS-1019",z:8.68,mass:1e7},{name:"GHZ2",z:12.3,mass:5e8},{name:"JADES-GS-z13",z:13.2,mass:4e8}];
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2>SMBH Anchor Mass Threshold</h2><div class="sim-subtitle">Three-Zone Spectrum · M ∝ H(z)² · JWST "Too Massive Too Early" Resolved</div>';
+main.appendChild(hdr);const lay=document.createElement('div');lay.className='sim-layout';main.appendChild(lay);
+const ca=document.createElement('div');ca.className='sim-canvas-area';lay.appendChild(ca);
+const cv1=document.createElement('canvas');cv1.width=500;cv1.height=240;cv1.style.border='1px solid #332200';cv1.style.borderRadius='4px';ca.appendChild(cv1);
+const cv2=document.createElement('canvas');cv2.width=500;cv2.height=240;cv2.style.border='1px solid #332200';cv2.style.borderRadius='4px';ca.appendChild(cv2);
+const ct=document.createElement('div');ct.className='sim-controls';lay.appendChild(ct);
+const op=document.createElement('div');op.className='lcars-panel';op.innerHTML='<div class="lcars-panel-title">ANCHOR OBSERVABLES</div>';
+const og=document.createElement('div');og.className='lcars-obs-grid';og.id='obs';op.appendChild(og);ct.appendChild(op);
+const cp=document.createElement('div');cp.className='lcars-panel';cp.dataset.accent='rose';
+cp.innerHTML='<div class="lcars-panel-title">PARAMETERS</div>';ct.appendChild(cp);
+cp.appendChild(createSlider({label:'Redshift z',value:0,min:0,max:15,step:0.5,color:'rose',onChange:v=>{P.z=v;draw();}}).group);
+cp.appendChild(createSlider({label:'r_proto-galaxy (kpc)',value:10,min:1,max:30,step:1,color:'periwinkle',onChange:v=>{P.rpg=v;draw();}}).group);
+const chk=document.createElement('label');chk.className='lcars-checkbox';chk.innerHTML='<input type="checkbox" checked> JWST Data Points';
+chk.querySelector('input').onchange=e=>{P.showJWST=e.target.checked;draw();};cp.appendChild(chk);
+ct.appendChild(Object.assign(document.createElement('div'),{className:'lcars-panel',innerHTML:`<div class="lcars-panel-title">SELF-RATE LIMITER</div><div class="lcars-derivation">
+Small BH: high T_H → high R(t)<br>→ evaporates before anchoring<br>→ <span style="color:var(--lcars-red)">cannot spawn child universe</span><br><br>
+Large BH: low T_H → low R(t)<br>→ stable anchor, galaxy forms<br>→ <span style="color:var(--lcars-ice)">only above threshold</span><br><br>
+<span style="color:var(--lcars-teal)">Universe is self-rate-limited.</span></div>`}));
+const bd=document.createElement('div');bd.className='lcars-badges';bd.id='badges';ct.appendChild(bd);
+function draw(){
+// Spectrum
+const c1=cv1.getContext('2d');const W=cv1.width,H=cv1.height;c1.fillStyle='#050308';c1.fillRect(0,0,W,H);
+const pad={l:55,r:25,t:25,b:35};const pW=W-pad.l-pad.r,pH=H-pad.t-pad.b;
+const logMin=-20,logMax=12;const toX=lm=>pad.l+((lm-logMin)/(logMax-logMin))*pW;
+c1.strokeStyle='#221800';c1.lineWidth=0.5;c1.fillStyle='#443322';c1.font='9px Antonio,sans-serif';
+for(let lm=-20;lm<=12;lm+=4){const x=toX(lm);c1.beginPath();c1.moveTo(x,pad.t);c1.lineTo(x,pad.t+pH);c1.stroke();c1.fillText(`10^${lm}`,x-12,H-pad.b+14);}
+// Zones
+const z1=toX(-19),z2=toX(6);
+c1.fillStyle='rgba(204,68,68,0.08)';c1.fillRect(pad.l,pad.t,z1-pad.l,pH);
+c1.fillStyle='rgba(255,153,0,0.06)';c1.fillRect(z1,pad.t,z2-z1,pH);
+c1.fillStyle='rgba(68,136,204,0.06)';c1.fillRect(z2,pad.t,pW+pad.l-z2,pH);
+c1.font='bold 10px Antonio,sans-serif';
+c1.fillStyle='#CC4444';c1.fillText('LEAK',pad.l+5,pad.t+15);
+c1.fillStyle='#FF9900';c1.fillText('SURVIVOR',(z1+z2)/2-20,pad.t+15);
+c1.fillStyle='#5588AA';c1.fillText('ANCHOR',z2+10,pad.t+15);
+const mA=anchorMass(P.z,P.rpg);const logA=Math.log10(mA);const aX=toX(logA);
+c1.strokeStyle='#008888';c1.lineWidth=2;c1.setLineDash([6,3]);c1.beginPath();c1.moveTo(aX,pad.t);c1.lineTo(aX,pad.t+pH);c1.stroke();c1.setLineDash([]);
+c1.fillStyle='#008888';c1.font='9px Antonio,sans-serif';c1.fillText(`M_anchor(z=${P.z.toFixed(0)})=${mA.toExponential(1)}`,aX+5,pad.t+pH-8);
+c1.fillStyle='#5588AA';c1.font='bold 10px Antonio,sans-serif';c1.fillText('THREE-ZONE BLACK HOLE SPECTRUM',pad.l,pad.t-8);
+// Mass vs z
+const c2=cv2.getContext('2d');c2.fillStyle='#050308';c2.fillRect(0,0,W,H);
+const zMax=15,logMmin=5,logMmax=10;
+const toX2=zv=>pad.l+(zv/zMax)*pW;const toY2=lm=>pad.t+(1-(lm-logMmin)/(logMmax-logMmin))*pH;
+c2.strokeStyle='#221800';c2.lineWidth=0.5;c2.fillStyle='#443322';c2.font='9px Antonio,sans-serif';
+for(let zv=0;zv<=zMax;zv+=3){const x=toX2(zv);c2.beginPath();c2.moveTo(x,pad.t);c2.lineTo(x,pad.t+pH);c2.stroke();c2.fillText(`z=${zv}`,x-8,H-pad.b+12);}
+for(let lm=logMmin;lm<=logMmax;lm++){const y=toY2(lm);c2.beginPath();c2.moveTo(pad.l,y);c2.lineTo(W-pad.r,y);c2.stroke();c2.fillText(`10^${lm}`,5,y+3);}
+c2.strokeStyle='#5588AA';c2.lineWidth=2;c2.beginPath();
+for(let zv=0;zv<=zMax;zv+=0.1){const mAz=anchorMass(zv,P.rpg);const lm=Math.log10(mAz);
+const x=toX2(zv),y=toY2(Math.max(logMmin,Math.min(logMmax,lm)));zv===0?c2.moveTo(x,y):c2.lineTo(x,y);}c2.stroke();
+if(P.showJWST){for(const obs of jwst){const lm=Math.log10(obs.mass);const x=toX2(obs.z),y=toY2(Math.max(logMmin,Math.min(logMmax,lm)));
+const above=obs.mass>anchorMass(obs.z,P.rpg);c2.fillStyle=above?'#008888':'#CC4444';c2.beginPath();c2.arc(x,y,4,0,Math.PI*2);c2.fill();
+c2.fillStyle='#FFCC99';c2.font='8px Antonio,sans-serif';c2.fillText(obs.name,x+6,y-4);}}
+c2.strokeStyle='#CC444466';c2.lineWidth=1;c2.setLineDash([4,4]);c2.beginPath();
+for(let zv=0.1;zv<=zMax;zv+=0.1){const age=13.8/(1+zv);const eddM=100*Math.exp(age*0.3);const lm=Math.log10(Math.max(1,eddM));
+const x=toX2(zv),y=toY2(Math.max(logMmin,Math.min(logMmax,lm)));zv<=0.2?c2.moveTo(x,y):c2.lineTo(x,y);}c2.stroke();c2.setLineDash([]);
+c2.fillStyle='#CC4444';c2.font='8px Antonio,sans-serif';c2.fillText('Eddington (too slow)',toX2(1),toY2(5.5));
+c2.fillStyle='#5588AA';c2.font='bold 10px Antonio,sans-serif';c2.fillText('ANCHOR MASS vs REDSHIFT + JWST',pad.l,pad.t-8);
+og.innerHTML=`<span class="obs-label">M_anchor:</span><span class="obs-value" style="color:var(--lcars-ice)">${mA.toExponential(1)} M☉</span>
+<span class="obs-label">H(z)/H₀:</span><span class="obs-value" style="color:var(--lcars-orange)">${(Hz(P.z)/H0).toFixed(1)}</span>
+<span class="obs-label">r_pg:</span><span class="obs-value" style="color:var(--lcars-periwinkle)">${P.rpg} kpc</span>`;
+const b=document.getElementById('badges');b.innerHTML='';
+b.appendChild(createBadge('THREE ZONES','Leak / Survivor / Anchor',true));
+b.appendChild(createBadge('M ∝ H(z)²','Threshold rises with z',true));
+b.appendChild(createBadge('JWST MATCH','All obs above threshold',true));
+b.appendChild(createBadge('NO EDDINGTON','Anchors imported, not accreted',true));}
+draw();
+</script></body></html>

@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 02: Dark Matter — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(2);const N=80;
+let channels,running=false,step=0;
+let P={beta_em:0.85,beta_grav:0.15,alpha:0.1,speed:4,view:'combined'};
+function init(){channels={em:new Float64Array(N*N),grav:new Float64Array(N*N),dm:new Float64Array(N*N)};
+const rng=((s)=>()=>{s=(s*16807)%2147483647;return s/2147483647;})(42);
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;const r=Math.sqrt((i-N/2)**2+(j-N/2)**2);
+const fil=Math.sin(i*0.12)*Math.cos(j*0.15)*0.5+0.5;
+channels.em[k]=0.3+0.5*fil+0.1*rng();channels.grav[k]=0.2+0.3*fil+0.05*rng();
+channels.dm[k]=0.1+0.05*rng();}step=0;}
+function evolve(){const{beta_em,beta_grav}=P;const dt=0.01;
+const ne=new Float64Array(N*N),ng=new Float64Array(N*N),nd=new Float64Array(N*N);
+const id=(i,j)=>((i+N)%N)*N+((j+N)%N);
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=id(i,j);
+const lex=channels.em[id(i+1,j)]+channels.em[id(i-1,j)]+channels.em[id(i,j+1)]+channels.em[id(i,j-1)]-4*channels.em[k];
+const lgx=channels.grav[id(i+1,j)]+channels.grav[id(i-1,j)]+channels.grav[id(i,j+1)]+channels.grav[id(i,j-1)]-4*channels.grav[k];
+const dex=(channels.em[id(i+1,j)]-channels.em[id(i-1,j)])/2;const dey=(channels.em[id(i,j+1)]-channels.em[id(i,j-1)])/2;
+const geN=Math.sqrt(dex*dex+dey*dey);const fE=Math.max(0,1-beta_em*beta_em*geN*geN);
+const dgx=(channels.grav[id(i+1,j)]-channels.grav[id(i-1,j)])/2;const dgy=(channels.grav[id(i,j+1)]-channels.grav[id(i,j-1)])/2;
+const ggN=Math.sqrt(dgx*dgx+dgy*dgy);const fG=Math.max(0,1-beta_grav*beta_grav*ggN*ggN);
+const saturation=1-fE;const overflow=saturation*channels.em[k]*0.01;
+ne[k]=channels.em[k]+dt*(fE*lex*0.3-overflow);ng[k]=channels.grav[k]+dt*(fG*lgx*0.3);
+nd[k]=channels.dm[k]+dt*overflow;}
+channels.em=ne;channels.grav=ng;channels.dm=nd;step++;}
+// UI
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2>Dark Matter Channel Saturation</h2><div class="sim-subtitle">β_EM Saturation → Invisible → DM is Entropy Overflow</div>';
+main.appendChild(hdr);
+const lay=document.createElement('div');lay.className='sim-layout';main.appendChild(lay);
+const ca=document.createElement('div');ca.className='sim-canvas-area';lay.appendChild(ca);
+const w1=document.createElement('div');w1.className='canvas-wrap';
+const cv=document.createElement('canvas');cv.width=400;cv.height=400;
+const lb=document.createElement('div');lb.className='canvas-label top-left';
+w1.appendChild(cv);w1.appendChild(lb);ca.appendChild(w1);
+const ct=document.createElement('div');ct.className='sim-controls';lay.appendChild(ct);
+const op=document.createElement('div');op.className='lcars-panel';
+op.innerHTML='<div class="lcars-panel-title">DM OBSERVABLES</div>';
+const og=document.createElement('div');og.className='lcars-obs-grid';og.id='obs';op.appendChild(og);ct.appendChild(op);
+const cp=document.createElement('div');cp.className='lcars-panel';cp.dataset.accent='lavender';
+cp.innerHTML='<div class="lcars-panel-title">PARAMETERS</div>';ct.appendChild(cp);
+const s1=createSlider({label:'β_EM',value:0.85,min:0.1,max:1.5,step:0.05,color:'gold',detail:'EM channel damping',onChange:v=>P.beta_em=v});cp.appendChild(s1.group);
+const s2=createSlider({label:'β_grav',value:0.15,min:0.01,max:1,step:0.01,detail:'Gravity channel (low β = transparent)',onChange:v=>P.beta_grav=v});cp.appendChild(s2.group);
+const s3=createSlider({label:'Speed',value:4,min:1,max:15,step:1,color:'teal',onChange:v=>P.speed=v});cp.appendChild(s3.group);
+const vl=document.createElement('div');vl.className='lcars-slider-label';vl.innerHTML='<span>View</span>';cp.appendChild(vl);
+cp.appendChild(createViewButtons(['combined','em','grav','dm'],'combined',m=>{P.view=m;draw();}));
+const bg=document.createElement('div');bg.className='lcars-btn-group';bg.style.marginTop='8px';
+const rb=document.createElement('button');rb.className='lcars-btn lcars-btn-run';rb.textContent='▶ ENGAGE';
+rb.onclick=()=>{running=!running;rb.textContent=running?'⏸ STANDBY':'▶ ENGAGE';rb.className=`lcars-btn ${running?'lcars-btn-pause':'lcars-btn-run'}`;if(running)loop();lcarsBeep(running?1500:800);};
+const rsb=document.createElement('button');rsb.className='lcars-btn lcars-btn-reset';rsb.textContent='↻ RESET';
+rsb.onclick=()=>{running=false;rb.textContent='▶ ENGAGE';rb.className='lcars-btn lcars-btn-run';init();draw();};
+bg.appendChild(rb);bg.appendChild(rsb);cp.appendChild(bg);
+const dp=document.createElement('div');dp.className='lcars-panel';dp.dataset.accent='rose';
+dp.innerHTML=`<div class="lcars-panel-title">DERIVATION</div><div class="lcars-derivation">
+<span class="step">Multi-channel entropy</span>: S = S_EM + S_grav + ...<br>
+Each channel has own β: β_EM ≫ β_grav<br>
+When β_EM|∇S_EM| → 1: <span class="result">EM channel saturates</span><br>
+Entropy overflow → <span class="key">dark matter</span><br>
+Gravity channel (low β) still transparent<br>
+→ DM feels gravity, invisible to EM<br>
+Ω_DM/Ω_b ≈ β_EM/β_grav = <span class="result">${(P.beta_em/P.beta_grav).toFixed(1)}</span></div>`;
+ct.appendChild(dp);
+const bd=document.createElement('div');bd.className='lcars-badges';bd.id='badges';ct.appendChild(bd);
+function draw(){const ctx=cv.getContext('2d');const cw=cv.width/N,ch=cv.height/N;
+let sE=0,sG=0,sD=0,mBG=0;
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;sE+=channels.em[k];sG+=channels.grav[k];sD+=channels.dm[k];
+const dex=(channels.em[((i+1)%N)*N+j]-channels.em[((i-1+N)%N)*N+j])/2;
+const dey=(channels.em[i*N+(j+1)%N]-channels.em[i*N+(j-1+N)%N])/2;
+const bg2=P.beta_em*Math.sqrt(dex*dex+dey*dey);if(bg2>mBG)mBG=bg2;
+if(P.view==='combined'){const eI=Math.min(1,channels.em[k]*2);const dI=Math.min(1,channels.dm[k]*8);
+ctx.fillStyle=`rgb(${~~(eI*200+20)},${~~(eI*150+dI*30+10)},${~~(dI*255+30)})`;}
+else if(P.view==='em'){const t=Math.min(1,channels.em[k]*2);ctx.fillStyle=`rgb(${~~(200*t+20)},${~~(120*t+10)},${~~(20+t*30)})`;}
+else if(P.view==='grav'){const t=Math.min(1,channels.grav[k]*3);ctx.fillStyle=`rgb(${~~(20+t*30)},${~~(150*t+10)},${~~(20+t*30)})`;}
+else{const t=Math.min(1,channels.dm[k]*8);ctx.fillStyle=`rgb(${~~(20+t*40)},${~~(10+t*20)},${~~(40+t*215)})`;}
+ctx.fillRect(j*cw,i*ch,cw+.5,ch+.5);}
+const tot=N*N;lb.textContent=`${P.view.toUpperCase()} | step ${step}`;
+const ratio=(sD/(sE+.001));
+og.innerHTML=`<span class="obs-label">⟨S_EM⟩:</span><span class="obs-value" style="color:var(--lcars-orange)">${(sE/tot).toFixed(3)}</span>
+<span class="obs-label">⟨S_grav⟩:</span><span class="obs-value" style="color:var(--lcars-teal)">${(sG/tot).toFixed(3)}</span>
+<span class="obs-label">⟨S_DM⟩:</span><span class="obs-value" style="color:var(--lcars-periwinkle)">${(sD/tot).toFixed(4)}</span>
+<span class="obs-label">Ω_DM/Ω_b:</span><span class="obs-value" style="color:var(--lcars-mauve)">${ratio.toFixed(2)}</span>
+<span class="obs-label">β_EM|∇|:</span><span class="obs-value" style="color:${mBG>0.8?'var(--lcars-orange)':'var(--lcars-teal)'}">${mBG.toFixed(3)}</span>`;
+const b=document.getElementById('badges');b.innerHTML='';
+b.appendChild(createBadge('EM SATURATED',`β_EM|∇S|=${mBG.toFixed(2)}`,mBG>0.5));
+b.appendChild(createBadge('DM FORMING',`⟨S_DM⟩=${(sD/tot).toFixed(4)}`,sD/tot>0.0001));
+b.appendChild(createBadge('RATIO','Ω_DM/Ω_b ≈ '+ratio.toFixed(1),ratio>3));}
+function loop(){if(!running)return;for(let s=0;s<P.speed;s++)evolve();draw();requestAnimationFrame(loop);}
+init();draw();
+</script></body></html>

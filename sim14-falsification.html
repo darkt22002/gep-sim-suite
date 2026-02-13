@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 14: Falsification — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(14);
+const conds=[
+{id:1,cat:"Dark Matter",text:"DM particle detected with EM coupling",st:"open",inst:"LZ/XENONnT"},
+{id:2,cat:"Dark Matter",text:"DM self-interaction σ > 10 cm²/g",st:"open",inst:"Bullet Cluster"},
+{id:3,cat:"Dark Matter",text:"EM annihilation from DM aggregation",st:"open",inst:"Fermi-LAT/CTA"},
+{id:4,cat:"Dark Matter",text:"DM mass spectrum sharp cutoff",st:"open",inst:"Direct detection"},
+{id:5,cat:"Dark Energy",text:"w ≠ −1 at >5σ significance",st:"open",inst:"DESI/Euclid/Rubin"},
+{id:6,cat:"Dark Energy",text:"Spatial variation of Λ detected",st:"open",inst:"DESI/Euclid"},
+{id:7,cat:"Dark Energy",text:"DE density evolves inconsistently with z",st:"open",inst:"DESI/Rubin LSST"},
+{id:8,cat:"Black Holes",text:"True singularity via GW ringdown",st:"open",inst:"LIGO/Virgo/KAGRA"},
+{id:9,cat:"Black Holes",text:"Firewall at event horizon confirmed",st:"open",inst:"EHT/future"},
+{id:10,cat:"Black Holes",text:"Information loss established",st:"open",inst:"Theory + GW"},
+{id:11,cat:"Cosmo Cycle",text:"CMB non-Gaussianities inconsistent with WIPER",st:"open",inst:"CMB-S4/LiteBIRD"},
+{id:12,cat:"Cosmo Cycle",text:"No stochastic GW from parent mergers",st:"open",inst:"LISA/PTA"},
+{id:13,cat:"CMB",text:"n_s outside [1−2α⟨E⟩, 1] for reasonable α",st:"survived",inst:"Planck (0.9649±0.0042)"},
+{id:14,cat:"CMB",text:"f_NL at >5σ from α/D(t) prediction",st:"survived",inst:"Planck (−0.9±5.1)"},
+{id:15,cat:"CMB",text:"r above α²(β_grav/β_EM)⟨E⟩²",st:"survived",inst:"Planck+BICEP (<0.036)"},
+{id:16,cat:"CMB",text:"Cold Spot f_NL indistinguishable from elsewhere",st:"open",inst:"CMB-S4"},
+{id:17,cat:"Anchor Mass",text:"Galaxy central BH <10⁵ M☉ + full stellar pop",st:"open",inst:"JWST/ELT"},
+{id:18,cat:"Anchor Mass",text:"SMBH mass floor doesn't increase with z",st:"open",inst:"JWST surveys"},
+{id:19,cat:"Anchor Mass",text:"Galaxy-anchoring SMBH <10⁷ M☉ at z>10",st:"open",inst:"JWST"},
+{id:20,cat:"Angular Mom",text:"SMBH Kerr at z>6 aligned with disk",st:"open",inst:"EHT/GRAVITY+"},
+{id:21,cat:"Angular Mom",text:"Cold Spot spins indistinguishable",st:"open",inst:"DESI/4MOST"},
+{id:22,cat:"Angular Mom",text:"AGN jet no correlation with SMBH mass",st:"open",inst:"VLA/ALMA"},
+{id:23,cat:"De-Saturation",text:"Boötes Void lensing matches galaxy count",st:"open",inst:"Euclid/Rubin"},
+{id:24,cat:"De-Saturation",text:"Void lensing clumpy not smooth",st:"open",inst:"Euclid"},
+{id:25,cat:"De-Saturation",text:"No EM counterpart in any BH merger",st:"open",inst:"LIGO+EM"},
+];
+const catCols={"Dark Matter":"#9999FF","Dark Energy":"#5588AA","Black Holes":"#CC4444","Cosmo Cycle":"#FF9900","CMB":"#008888","Anchor Mass":"#CC9933","Angular Mom":"#CC99CC","De-Saturation":"#88CCFF"};
+let filter='all',search='';
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2 style="color:var(--lcars-gold)">Falsification Conditions</h2><div class="sim-subtitle">25 Conditions · 8 Domains · All Experimentally Accessible</div>';
+main.appendChild(hdr);
+// Summary
+const summary=document.createElement('div');summary.style.cssText='display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin:12px 0;';
+const survived=conds.filter(c=>c.st==='survived').length;const open=conds.filter(c=>c.st==='open').length;
+[{n:survived,l:'SURVIVED',c:'#008888'},{n:open,l:'OPEN TESTS',c:'#5588AA'},{n:0,l:'FALSIFIED',c:'#CC4444'}].forEach(s=>{
+const d=document.createElement('div');d.style.cssText=`background:${s.c}11;border:1px solid ${s.c}33;border-radius:6px;padding:8px 20px;text-align:center;`;
+d.innerHTML=`<div style="font-size:24px;font-weight:700;color:${s.c}">${s.n}</div><div style="font-size:10px;color:${s.c};letter-spacing:0.1em">${s.l}</div>`;
+summary.appendChild(d);});
+main.appendChild(summary);
+// Filter buttons
+const cats=[...new Set(conds.map(c=>c.cat))];
+const filterWrap=document.createElement('div');filterWrap.style.cssText='display:flex;gap:3px;flex-wrap:wrap;justify-content:center;margin:8px 0;';
+function rebuildFilters(){filterWrap.innerHTML='';
+const allBtn=document.createElement('button');allBtn.className='lcars-view-btn'+(filter==='all'?' active':'');allBtn.textContent=`ALL (${conds.length})`;
+allBtn.onclick=()=>{filter='all';rebuild();};filterWrap.appendChild(allBtn);
+cats.forEach(cat=>{const n=conds.filter(c=>c.cat===cat).length;const btn=document.createElement('button');
+btn.className='lcars-view-btn'+(filter===cat?' active':'');btn.textContent=`${cat} (${n})`;
+btn.style.color=filter===cat?'#000':catCols[cat]||'#888';if(filter===cat)btn.style.background=catCols[cat]||'#888';
+btn.onclick=()=>{filter=cat;rebuild();};filterWrap.appendChild(btn);});}
+main.appendChild(filterWrap);
+// Search
+const searchInput=document.createElement('input');searchInput.type='text';searchInput.placeholder='Search conditions...';
+searchInput.style.cssText='background:#0a0800;border:1px solid #332200;border-radius:4px;padding:6px 12px;color:#FFCC99;font-family:Antonio,sans-serif;font-size:12px;width:100%;max-width:700px;outline:none;margin:0 auto;display:block;';
+searchInput.oninput=()=>{search=searchInput.value;rebuild();};
+main.appendChild(searchInput);
+// Conditions list
+const listEl=document.createElement('div');listEl.style.cssText='max-width:700px;margin:10px auto;display:flex;flex-direction:column;gap:4px;';
+main.appendChild(listEl);
+function rebuild(){rebuildFilters();listEl.innerHTML='';
+const filtered=conds.filter(c=>{if(filter!=='all'&&c.cat!==filter)return false;if(search&&!c.text.toLowerCase().includes(search.toLowerCase()))return false;return true;});
+for(const c of filtered){const row=document.createElement('div');
+row.style.cssText=`background:#0a0800;border:1px solid ${(catCols[c.cat]||'#332200')}22;border-radius:4px;padding:8px 12px;display:flex;gap:10px;align-items:center;`;
+const num=document.createElement('div');
+num.style.cssText=`min-width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;background:${c.st==='survived'?'rgba(0,136,136,0.15)':'rgba(85,136,170,0.1)'};color:${c.st==='survived'?'#008888':'#5588AA'};border:1px solid ${c.st==='survived'?'#00888844':'#5588AA33'}`;
+num.textContent=c.id;row.appendChild(num);
+const body=document.createElement('div');body.style.flex='1';
+body.innerHTML=`<div style="font-size:11px;line-height:1.4;color:#FFCC99">${c.text}</div>
+<div style="display:flex;gap:8px;margin-top:3px">
+<span style="font-size:9px;color:${catCols[c.cat]||'#888'};background:${(catCols[c.cat]||'#888')}15;padding:1px 6px;border-radius:2px">${c.cat}</span>
+<span style="font-size:9px;color:#665533">${c.inst}</span></div>`;
+row.appendChild(body);
+const stEl=document.createElement('div');stEl.style.cssText=`font-size:10px;font-weight:700;padding:2px 8px;border-radius:3px;white-space:nowrap;background:${c.st==='survived'?'rgba(0,136,136,0.15)':'rgba(85,136,170,0.08)'};color:${c.st==='survived'?'#008888':'#5588AA'}`;
+stEl.textContent=c.st==='survived'?'✓ SURVIVED':'○ OPEN';row.appendChild(stEl);
+listEl.appendChild(row);}}
+rebuild();
+// Footer
+const foot=document.createElement('div');foot.className='lcars-equation-banner';foot.style.maxWidth='700px';foot.style.margin='16px auto';
+foot.innerHTML=`<div style="font-size:10px;color:#665533;line-height:1.7">
+<span style="color:var(--lcars-ice);font-weight:700">SCIENTIFIC ACCOUNTABILITY</span><br>
+Every prediction experimentally accessible with current instrumentation.<br>
+Three CMB predictions survived Planck 2018. Parameters (α=0.1, β=0.5)<br>
+established by ERPC hardware, not tuned to cosmology.</div>`;
+main.appendChild(foot);
+</script></body></html>

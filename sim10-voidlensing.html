@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 10: Void Lensing — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(10);const N=80;
+let dm,baryon,grav,running=false,step=0;let P={betaEM:0.85,sigma:0.05,voidSize:0.5,speed:3,view:'combined'};
+function init(){dm=new Float64Array(N*N);baryon=new Float64Array(N*N);grav=new Float64Array(N*N);
+const rng=((s)=>()=>{s=(s*16807)%2147483647;return s/2147483647;})(88);const cx=N/2,cy=N/2;const vR=P.voidSize*N/2;
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;const r=Math.sqrt((i-cx)**2+(j-cy)**2);
+if(r<vR){dm[k]=0.3+0.1*rng();baryon[k]=0.02*rng();grav[k]=0.05+0.02*rng();}
+else{const fil=Math.sin(i*0.15)*Math.cos(j*0.12);dm[k]=0.1+0.15*Math.max(0,fil);baryon[k]=0.3+0.4*Math.max(0,fil)+0.1*rng();grav[k]=0.3+0.5*Math.abs(fil);}}step=0;}
+function evolve(){const nDM=new Float64Array(N*N),nB=new Float64Array(N*N);const dt=0.01;
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;
+const gravF=0.15*grav[k];const emH=P.betaEM*(1-P.betaEM*0.95);
+const desatRate=P.sigma*P.sigma*grav[k]*grav[k]/P.betaEM;
+const deSat=gravF>emH/P.sigma?desatRate*dt:0;
+nDM[k]=Math.max(0,dm[k]-deSat);nB[k]=baryon[k]+deSat;}dm=nDM;baryon=nB;step++;}
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2>Void Lensing & De-Saturation</h2><div class="sim-subtitle">EM-Saturated DM Fills Voids → Smooth Lensing → Boötes Void Test</div>';
+main.appendChild(hdr);const lay=document.createElement('div');lay.className='sim-layout';main.appendChild(lay);
+const ca=document.createElement('div');ca.className='sim-canvas-area';lay.appendChild(ca);
+const w1=document.createElement('div');w1.className='canvas-wrap';const cv=document.createElement('canvas');cv.width=400;cv.height=400;
+const lb=document.createElement('div');lb.className='canvas-label top-left';w1.appendChild(cv);w1.appendChild(lb);ca.appendChild(w1);
+const ct=document.createElement('div');ct.className='sim-controls';lay.appendChild(ct);
+const op=document.createElement('div');op.className='lcars-panel';op.innerHTML='<div class="lcars-panel-title">VOID OBSERVABLES</div>';
+const og=document.createElement('div');og.className='lcars-obs-grid';og.id='obs';op.appendChild(og);ct.appendChild(op);
+const cp=document.createElement('div');cp.className='lcars-panel';cp.dataset.accent='lavender';
+cp.innerHTML='<div class="lcars-panel-title">PARAMETERS</div>';ct.appendChild(cp);
+cp.appendChild(createSlider({label:'β_EM',value:0.85,min:0.3,max:1.5,step:0.05,color:'gold',onChange:v=>{P.betaEM=v;}}).group);
+cp.appendChild(createSlider({label:'σ_cross',value:0.05,min:0.001,max:0.2,step:0.001,color:'periwinkle',onChange:v=>P.sigma=v}).group);
+cp.appendChild(createSlider({label:'Void size',value:0.5,min:0.2,max:0.8,step:0.05,color:'rose',onChange:v=>{P.voidSize=v;init();draw();}}).group);
+cp.appendChild(createSlider({label:'Speed',value:3,min:1,max:15,step:1,color:'teal',onChange:v=>P.speed=v}).group);
+const vl=document.createElement('div');vl.className='lcars-slider-label';vl.innerHTML='<span>View</span>';cp.appendChild(vl);
+cp.appendChild(createViewButtons(['combined','dm','lensing'],'combined',m=>{P.view=m;draw();}));
+const bg=document.createElement('div');bg.className='lcars-btn-group';bg.style.marginTop='8px';
+const rb=document.createElement('button');rb.className='lcars-btn lcars-btn-run';rb.textContent='▶ DE-SATURATE';
+rb.onclick=()=>{running=!running;rb.textContent=running?'⏸ STANDBY':'▶ DE-SATURATE';rb.className=`lcars-btn ${running?'lcars-btn-pause':'lcars-btn-run'}`;if(running)loop();};
+const rsb=document.createElement('button');rsb.className='lcars-btn lcars-btn-reset';rsb.textContent='↻ RESET';
+rsb.onclick=()=>{running=false;rb.textContent='▶ DE-SATURATE';rb.className='lcars-btn lcars-btn-run';init();draw();};
+bg.appendChild(rb);bg.appendChild(rsb);cp.appendChild(bg);
+ct.appendChild(Object.assign(document.createElement('div'),{className:'lcars-panel',innerHTML:'<div class="lcars-panel-title">PHYSICS</div><div class="lcars-derivation">EM-saturated → cannot cool/collapse<br>→ DM fills voids uniformly<br><span style="color:var(--lcars-teal)">GEP: smooth void lensing</span><br><span style="color:var(--lcars-red)">CDM: clumpy subhalos in voids</span><br><br>Boötes Void: 330 Mly, 60 galaxies<br>(expected 10,000 in CDM)<br><br>De-saturation in strong grav:<br>σ²|∇S_grav|²/β_EM → EM unlocks<br>→ BH merger EM counterparts</div>'}));
+const bd=document.createElement('div');bd.className='lcars-badges';bd.id='badges';ct.appendChild(bd);
+function draw(){const ctx=cv.getContext('2d');const cw=cv.width/N,ch=cv.height/N;
+const cx=N/2,cy=N/2,vR=P.voidSize*N/2;let vDM=0,vB=0,vc=0;
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;const r=Math.sqrt((i-cx)**2+(j-cy)**2);
+if(r<vR){vDM+=dm[k];vB+=baryon[k];vc++;}
+if(P.view==='combined'){const dI=Math.min(1,dm[k]*3),bI=Math.min(1,baryon[k]*2);
+ctx.fillStyle=`rgb(${~~(bI*200+20)},${~~(bI*150+dI*30+15)},${~~(dI*255+30)})`;}
+else if(P.view==='dm'){const t=Math.min(1,dm[k]*3);ctx.fillStyle=`rgb(${~~(15+t*40)},${~~(10+t*20)},${~~(40+t*215)})`;}
+else{const total=dm[k]+baryon[k];const t=Math.min(1,total*2);ctx.fillStyle=`rgb(${~~(20+t*235)},${~~(20+t*180)},${~~(30+t*40)})`;}
+ctx.fillRect(j*cw,i*ch,cw+.5,ch+.5);}
+ctx.strokeStyle='rgba(255,255,255,0.15)';ctx.lineWidth=1;ctx.setLineDash([4,4]);
+ctx.beginPath();ctx.arc(cv.width/2,cv.height/2,vR*cw,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+lb.textContent=`${P.view.toUpperCase()} | step ${step}`;
+const avgDM=vc>0?vDM/vc:0,avgB=vc>0?vB/vc:0,ratio=avgDM/(avgB+.001);
+og.innerHTML=`<span class="obs-label">Void ⟨ρ_DM⟩:</span><span class="obs-value" style="color:var(--lcars-periwinkle)">${avgDM.toFixed(3)}</span>
+<span class="obs-label">Void ⟨ρ_b⟩:</span><span class="obs-value" style="color:var(--lcars-orange)">${avgB.toFixed(3)}</span>
+<span class="obs-label">Lensing DM/b:</span><span class="obs-value" style="color:var(--lcars-teal)">${ratio.toFixed(1)}×</span>`;
+const b=document.getElementById('badges');b.innerHTML='';
+b.appendChild(createBadge('SMOOTH VOID DM',"EM-saturated → can't clump",true));
+b.appendChild(createBadge('LENSING EXCESS',`${ratio.toFixed(1)}× more DM`,ratio>3));
+b.appendChild(createBadge('BOÖTES TEST','330 Mly void, 60 galaxies',true));
+b.appendChild(createBadge('BH MERGER EM','De-sat → EM counterpart',true));}
+function loop(){if(!running)return;for(let s=0;s<P.speed;s++)evolve();draw();requestAnimationFrame(loop);}
+init();draw();
+</script></body></html>

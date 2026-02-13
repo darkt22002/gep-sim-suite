@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEP 06: Lorentzian Emergence — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css">
+<script src="lcars-core.js"></script>
+</head>
+<body>
+<script>
+const main = buildLCARSFrame(6);
+const N = 120;
+
+let field, velocity, running = false, step = 0;
+let params = { beta: 0.5, dcr: 1.0, speed: 4, view: 'field', initMode: 'pulse' };
+
+function init() {
+  field = new Float64Array(N * N);
+  velocity = new Float64Array(N * N);
+  const cx = N / 2, cy = N / 2;
+  if (params.initMode === 'pulse') {
+    for (let i = 0; i < N; i++)
+      for (let j = 0; j < N; j++) {
+        const r = Math.sqrt((i-cx)**2 + (j-cy)**2);
+        field[i*N+j] = 2 * Math.exp(-r*r / 8);
+      }
+  } else if (params.initMode === 'double') {
+    for (let i = 0; i < N; i++)
+      for (let j = 0; j < N; j++) {
+        const r1 = Math.sqrt((i-cx+15)**2 + (j-cy)**2);
+        const r2 = Math.sqrt((i-cx-15)**2 + (j-cy)**2);
+        field[i*N+j] = 1.5 * Math.exp(-r1*r1/8) + 1.5 * Math.exp(-r2*r2/8);
+      }
+  } else {
+    for (let i = 0; i < N; i++)
+      for (let j = 0; j < N; j++)
+        field[i*N+j] = (Math.abs(i - cx) < 3) ? 1.5 * Math.cos(j * 0.2) : 0;
+  }
+  step = 0;
+}
+
+function evolve() {
+  const { beta, dcr } = params;
+  const nf = new Float64Array(N*N), nv = new Float64Array(N*N);
+  const dt = 0.08, c2 = dcr * dcr;
+  const id = (i,j) => ((i+N)%N)*N + ((j+N)%N);
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const k = id(i,j);
+      const lap = field[id(i+1,j)]+field[id(i-1,j)]+field[id(i,j+1)]+field[id(i,j-1)]-4*field[k];
+      const dx = (field[id(i+1,j)]-field[id(i-1,j)])/2;
+      const dy = (field[id(i,j+1)]-field[id(i,j-1)])/2;
+      const gN = Math.sqrt(dx*dx+dy*dy);
+      const fB = beta > 0.001 ? Math.max(0, 1 - beta*beta*gN*gN) : 1;
+      nv[k] = velocity[k] + dt * (c2 * fB * lap - 0.005 * velocity[k]);
+      nf[k] = field[k] + dt * nv[k];
+    }
+  }
+  field = nf; velocity = nv; step++;
+}
+
+// UI
+const header = document.createElement('div');
+header.className = 'sim-header';
+header.innerHTML = `
+  <h2>Lorentzian Emergence</h2>
+  <div class="sim-subtitle">β = 0 → Parabolic (No Causality) · β > 0 → Hyperbolic (Light Cones)</div>
+`;
+main.appendChild(header);
+
+const layout = document.createElement('div');
+layout.className = 'sim-layout';
+main.appendChild(layout);
+
+const canvasArea = document.createElement('div');
+canvasArea.className = 'sim-canvas-area';
+layout.appendChild(canvasArea);
+
+const wrap1 = document.createElement('div');
+wrap1.className = 'canvas-wrap';
+const canvas = document.createElement('canvas');
+canvas.width = 480; canvas.height = 480;
+const lbl = document.createElement('div');
+lbl.className = 'canvas-label top-left';
+wrap1.appendChild(canvas);
+wrap1.appendChild(lbl);
+canvasArea.appendChild(wrap1);
+
+// Spacetime diagram
+const stCanvas = document.createElement('canvas');
+stCanvas.width = 480; stCanvas.height = 150;
+stCanvas.style.border = '1px solid #332200';
+stCanvas.style.borderRadius = '4px';
+canvasArea.appendChild(stCanvas);
+
+const controls = document.createElement('div');
+controls.className = 'sim-controls';
+layout.appendChild(controls);
+
+const obsPanel = document.createElement('div');
+obsPanel.className = 'lcars-panel';
+obsPanel.innerHTML = '<div class="lcars-panel-title">SPACETIME OBSERVABLES</div>';
+const obsGrid = document.createElement('div');
+obsGrid.className = 'lcars-obs-grid';
+obsGrid.id = 'obs';
+obsPanel.appendChild(obsGrid);
+controls.appendChild(obsPanel);
+
+const ctrlPanel = document.createElement('div');
+ctrlPanel.className = 'lcars-panel';
+ctrlPanel.dataset.accent = 'periwinkle';
+ctrlPanel.innerHTML = '<div class="lcars-panel-title">PARAMETERS</div>';
+controls.appendChild(ctrlPanel);
+
+const bS = createSlider({ label: 'β', value: 0.5, min: 0, max: 2, step: 0.05, color: 'gold',
+  detail: 'β=0: heat eq | β>0: wave eq',
+  onChange: v => params.beta = v });
+ctrlPanel.appendChild(bS.group);
+
+const dS = createSlider({ label: 'D·C·R', value: 1.0, min: 0.1, max: 3, step: 0.1,
+  detail: 'Characteristic speed coefficient',
+  onChange: v => params.dcr = v });
+ctrlPanel.appendChild(dS.group);
+
+const spS = createSlider({ label: 'Speed', value: 4, min: 1, max: 15, step: 1, color: 'teal',
+  onChange: v => params.speed = v });
+ctrlPanel.appendChild(spS.group);
+
+const vl = document.createElement('div');
+vl.className = 'lcars-slider-label';
+vl.innerHTML = '<span>Init Mode</span>';
+ctrlPanel.appendChild(vl);
+ctrlPanel.appendChild(createViewButtons(['pulse','double','plane'], 'pulse', m => { params.initMode = m; init(); draw(); }));
+
+const vl2 = document.createElement('div');
+vl2.className = 'lcars-slider-label';
+vl2.innerHTML = '<span>View</span>';
+vl2.style.marginTop = '6px';
+ctrlPanel.appendChild(vl2);
+ctrlPanel.appendChild(createViewButtons(['field','damping'], 'field', m => { params.view = m; draw(); }));
+
+const bg = document.createElement('div');
+bg.className = 'lcars-btn-group';
+bg.style.marginTop = '8px';
+const runBtn = document.createElement('button');
+runBtn.className = 'lcars-btn lcars-btn-run';
+runBtn.textContent = '▶ ENGAGE';
+runBtn.onclick = () => {
+  running = !running;
+  runBtn.textContent = running ? '⏸ STANDBY' : '▶ ENGAGE';
+  runBtn.className = `lcars-btn ${running ? 'lcars-btn-pause' : 'lcars-btn-run'}`;
+  if (running) loop();
+  lcarsBeep(running ? 1500 : 800);
+};
+const resetBtn = document.createElement('button');
+resetBtn.className = 'lcars-btn lcars-btn-reset';
+resetBtn.textContent = '↻ RESET';
+resetBtn.onclick = () => { running = false; runBtn.textContent = '▶ ENGAGE'; runBtn.className = 'lcars-btn lcars-btn-run'; init(); draw(); };
+bg.appendChild(runBtn);
+bg.appendChild(resetBtn);
+ctrlPanel.appendChild(bg);
+
+const derivPanel = document.createElement('div');
+derivPanel.className = 'lcars-panel';
+derivPanel.dataset.accent = 'lavender';
+derivPanel.innerHTML = `
+  <div class="lcars-panel-title">DERIVATION</div>
+  <div class="lcars-derivation">
+    <span class="step">ΔS = D·C·R·(1+αE−β‖∇S‖)</span><br>
+    β bounds |∇S| ≤ 1/β<br>
+    → max speed <span class="result">c = D·C·R·β</span><br>
+    → hyperbolic PDE → wave equation<br>
+    → <span class="key">ds² = −c²dt² + dx²</span><br>
+    → Lorentzian signature → light cones<br>
+    β = 0 → parabolic → <span class="result">infinite speed (no causality)</span>
+  </div>
+`;
+controls.appendChild(derivPanel);
+
+const badgesEl = document.createElement('div');
+badgesEl.className = 'lcars-badges';
+badgesEl.id = 'badges';
+controls.appendChild(badgesEl);
+
+function draw() {
+  const ctx = canvas.getContext('2d');
+  const cw = canvas.width / N, ch = canvas.height / N;
+  const cx2 = N / 2, cy2 = N / 2;
+  let maxBG = 0;
+
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const k = i * N + j;
+      const dx = (field[((i+1)%N)*N+j] - field[((i-1+N)%N)*N+j]) / 2;
+      const dy = (field[i*N+(j+1)%N] - field[i*N+(j-1+N)%N]) / 2;
+      const gN = Math.sqrt(dx*dx + dy*dy);
+      const bg = params.beta * gN;
+      if (bg > maxBG) maxBG = bg;
+
+      if (params.view === 'field') {
+        const v = field[k];
+        const t = (v + 2) / 4;
+        const r = ~~(Math.min(1, Math.max(0, t)) * 200 + 20);
+        const g = ~~(Math.min(1, Math.max(0, t)) * 160 + 10);
+        const b = ~~(Math.min(1, Math.max(0, 1 - t)) * 200 + 30);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+      } else {
+        const fB = Math.max(0, 1 - params.beta**2 * gN * gN);
+        ctx.fillStyle = `rgb(${~~((1-fB)*255)},${~~(fB*200)},${~~(40+fB*80)})`;
+      }
+      ctx.fillRect(j * cw, i * ch, cw + 0.5, ch + 0.5);
+    }
+  }
+
+  // Light cone circle
+  if (params.beta > 0.001) {
+    const c_speed = params.dcr * params.beta;
+    const radius = c_speed * step * 0.08 * cw;
+    if (radius > 2 && radius < canvas.width) {
+      ctx.strokeStyle = 'rgba(255,204,0,0.4)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  }
+
+  const c_val = params.dcr * params.beta;
+  const pdeType = params.beta > 0.001 ? 'HYPERBOLIC' : 'PARABOLIC';
+  const sig = params.beta > 0.001 ? '(−,+,+,+)' : 'DEGENERATE';
+
+  lbl.textContent = `${params.view.toUpperCase()} | step ${step} | ${pdeType}`;
+
+  document.getElementById('obs').innerHTML = `
+    <span class="obs-label">c = D·C·R·β:</span><span class="obs-value" style="color:var(--lcars-orange)">${c_val.toFixed(3)}</span>
+    <span class="obs-label">PDE type:</span><span class="obs-value" style="color:${params.beta>0.001?'var(--lcars-teal)':'var(--lcars-red)'}">${pdeType}</span>
+    <span class="obs-label">Signature:</span><span class="obs-value" style="color:var(--lcars-periwinkle)">${sig}</span>
+    <span class="obs-label">max β|∇S|:</span><span class="obs-value" style="color:${maxBG<1?'var(--lcars-teal)':'var(--lcars-red)'}">${maxBG.toFixed(3)}</span>
+  `;
+
+  const b = document.getElementById('badges');
+  b.innerHTML = '';
+  b.appendChild(createBadge('HYPERBOLIC', 'β > 0', params.beta > 0.001));
+  b.appendChild(createBadge('LIGHT CONE', `c = ${c_val.toFixed(2)}`, params.beta > 0.001));
+  b.appendChild(createBadge('CAUSALITY', `max β|∇S| = ${maxBG.toFixed(2)}`, maxBG < 1.1));
+  b.appendChild(createBadge('LORENTZIAN', sig, params.beta > 0.001));
+
+  drawSpacetime();
+}
+
+function drawSpacetime() {
+  const ctx = stCanvas.getContext('2d');
+  const W = stCanvas.width, H = stCanvas.height;
+  ctx.fillStyle = '#0a0800';
+  ctx.fillRect(0, 0, W, H);
+
+  const pad = { l: 40, r: 20, t: 15, b: 20 };
+  const pW = W - pad.l - pad.r, pH = H - pad.t - pad.b;
+
+  // Axes
+  ctx.strokeStyle = '#332200';
+  ctx.lineWidth = 0.5;
+  const midX = pad.l + pW / 2;
+  ctx.beginPath(); ctx.moveTo(pad.l, pad.t + pH); ctx.lineTo(W - pad.r, pad.t + pH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(midX, pad.t); ctx.lineTo(midX, pad.t + pH); ctx.stroke();
+
+  if (params.beta > 0.001) {
+    const c_val = params.dcr * params.beta;
+    const angle = Math.atan(1 / c_val);
+
+    // Light cone edges
+    ctx.strokeStyle = '#FFCC0066';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(midX, pad.t + pH);
+    ctx.lineTo(midX - pH / Math.tan(angle), pad.t);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(midX, pad.t + pH);
+    ctx.lineTo(midX + pH / Math.tan(angle), pad.t);
+    ctx.stroke();
+
+    // Causal fill
+    ctx.fillStyle = 'rgba(0,80,136,0.15)';
+    ctx.beginPath();
+    ctx.moveTo(midX, pad.t + pH);
+    ctx.lineTo(midX - pH / Math.tan(angle), pad.t);
+    ctx.lineTo(midX + pH / Math.tan(angle), pad.t);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#665533';
+    ctx.font = '9px Antonio, sans-serif';
+    ctx.fillText('CAUSAL', midX - 15, pad.t + pH / 2);
+    ctx.fillStyle = '#44220066';
+    ctx.fillText('SPACELIKE', pad.l + 10, pad.t + 20);
+    ctx.fillText('SPACELIKE', W - pad.r - 60, pad.t + 20);
+  } else {
+    ctx.fillStyle = 'rgba(200,60,0,0.1)';
+    ctx.fillRect(pad.l, pad.t, pW, pH);
+    ctx.fillStyle = '#CC4444';
+    ctx.font = '12px Antonio, sans-serif';
+    ctx.fillText('β = 0: NO LIGHT CONE — INFINITE SPEED', midX - 120, pad.t + pH / 2);
+  }
+
+  ctx.fillStyle = '#665533';
+  ctx.font = '9px Antonio, sans-serif';
+  ctx.fillText('x', W - pad.r + 5, pad.t + pH + 4);
+  ctx.fillText('t', midX + 5, pad.t - 2);
+}
+
+function loop() {
+  if (!running) return;
+  for (let s = 0; s < params.speed; s++) evolve();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+init();
+draw();
+</script>
+</body>
+</html>

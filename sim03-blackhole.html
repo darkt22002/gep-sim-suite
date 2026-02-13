@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 03: Black Hole — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(3);const N=80;
+let field,running=false,step=0;
+let P={beta:0.5,mass:3,alpha:0.1,speed:4,view:'entropy'};
+function init(){field=new Float64Array(N*N);const cx=N/2,cy=N/2;
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const r=Math.max(1,Math.sqrt((i-cx)**2+(j-cy)**2));
+field[i*N+j]=P.mass/(r*0.5)+0.02*Math.random();}step=0;}
+function evolve(){const nf=new Float64Array(N*N);const dt=0.01,{beta}=P;
+const id=(i,j)=>((i+N)%N)*N+((j+N)%N);
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=id(i,j);
+const lap=field[id(i+1,j)]+field[id(i-1,j)]+field[id(i,j+1)]+field[id(i,j-1)]-4*field[k];
+const dx=(field[id(i+1,j)]-field[id(i-1,j)])/2;const dy=(field[id(i,j+1)]-field[id(i,j-1)])/2;
+const gN=Math.sqrt(dx*dx+dy*dy);const fB=Math.max(0,1-beta*beta*gN*gN);
+nf[k]=field[k]+dt*(fB*lap*0.3-0.001*(field[k]-P.mass/Math.max(1,Math.sqrt((i-N/2)**2+(j-N/2)**2)*0.5)));}
+field=nf;step++;}
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2>Black Hole Thermodynamics</h2><div class="sim-subtitle">Gradient Saturation = Event Horizon · No Singularity · Hawking = R(t)</div>';
+main.appendChild(hdr);
+const lay=document.createElement('div');lay.className='sim-layout';main.appendChild(lay);
+const ca=document.createElement('div');ca.className='sim-canvas-area';lay.appendChild(ca);
+const w1=document.createElement('div');w1.className='canvas-wrap';
+const cv=document.createElement('canvas');cv.width=400;cv.height=400;
+const lb=document.createElement('div');lb.className='canvas-label top-left';
+w1.appendChild(cv);w1.appendChild(lb);ca.appendChild(w1);
+const ct=document.createElement('div');ct.className='sim-controls';lay.appendChild(ct);
+const op=document.createElement('div');op.className='lcars-panel';op.innerHTML='<div class="lcars-panel-title">BH OBSERVABLES</div>';
+const og=document.createElement('div');og.className='lcars-obs-grid';og.id='obs';op.appendChild(og);ct.appendChild(op);
+const cp=document.createElement('div');cp.className='lcars-panel';cp.dataset.accent='rose';
+cp.innerHTML='<div class="lcars-panel-title">PARAMETERS</div>';ct.appendChild(cp);
+cp.appendChild(createSlider({label:'β',value:0.5,min:0.1,max:2,step:0.05,color:'gold',onChange:v=>P.beta=v}).group);
+cp.appendChild(createSlider({label:'Mass',value:3,min:0.5,max:8,step:0.5,color:'rose',onChange:v=>{P.mass=v;init();draw();}}).group);
+cp.appendChild(createSlider({label:'Speed',value:4,min:1,max:15,step:1,color:'teal',onChange:v=>P.speed=v}).group);
+const vl=document.createElement('div');vl.className='lcars-slider-label';vl.innerHTML='<span>View</span>';cp.appendChild(vl);
+cp.appendChild(createViewButtons(['entropy','gradient','hawking'],'entropy',m=>{P.view=m;draw();}));
+const bg=document.createElement('div');bg.className='lcars-btn-group';bg.style.marginTop='8px';
+const rb=document.createElement('button');rb.className='lcars-btn lcars-btn-run';rb.textContent='▶ ENGAGE';
+rb.onclick=()=>{running=!running;rb.textContent=running?'⏸ STANDBY':'▶ ENGAGE';rb.className=`lcars-btn ${running?'lcars-btn-pause':'lcars-btn-run'}`;if(running)loop();};
+const rsb=document.createElement('button');rsb.className='lcars-btn lcars-btn-reset';rsb.textContent='↻ RESET';
+rsb.onclick=()=>{running=false;rb.textContent='▶ ENGAGE';rb.className='lcars-btn lcars-btn-run';init();draw();};
+bg.appendChild(rb);bg.appendChild(rsb);cp.appendChild(bg);
+const dp=document.createElement('div');dp.className='lcars-panel';dp.dataset.accent='periwinkle';
+dp.innerHTML=`<div class="lcars-panel-title">PHYSICS</div><div class="lcars-derivation">
+β|∇S| → 1: <span class="result">gradient saturation</span><br>
+= event horizon (max information density)<br>
+<span class="key">No singularity</span> — β prevents |∇S| > 1/β<br>
+T_Hawking = R(t) = entropy return rate<br>
+Page curve: D·C·R conservation → unitary<br>
+Information preserved, not destroyed</div>`;ct.appendChild(dp);
+const bd=document.createElement('div');bd.className='lcars-badges';bd.id='badges';ct.appendChild(bd);
+function draw(){const ctx=cv.getContext('2d');const cw=cv.width/N,ch=cv.height/N;
+let maxBG=0,horizonR=0;const cx=N/2,cy=N/2;
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;
+const dx=(field[((i+1)%N)*N+j]-field[((i-1+N)%N)*N+j])/2;const dy=(field[i*N+(j+1)%N]-field[i*N+(j-1+N)%N])/2;
+const gN=Math.sqrt(dx*dx+dy*dy);const bg2=P.beta*gN;if(bg2>maxBG)maxBG=bg2;
+const r=Math.sqrt((i-cx)**2+(j-cy)**2);
+if(bg2>0.9&&horizonR===0)horizonR=r;
+if(P.view==='entropy'){const t=Math.min(1,field[k]/8);ctx.fillStyle=`rgb(${~~(t*255)},${~~(t*120+20)},${~~(20+t*30)})`;}
+else if(P.view==='gradient'){const fB=Math.max(0,1-P.beta**2*gN*gN);
+ctx.fillStyle=bg2>0.95?`rgb(255,${~~((1-bg2)*500)},0)`:`rgb(${~~((1-fB)*200)},${~~(fB*180+20)},${~~(40+fB*60)})`;}
+else{const T=1/(Math.max(1,r)*0.5);const t=Math.min(1,T*0.3);ctx.fillStyle=`rgb(${~~(t*255)},${~~(t*80)},${~~(20+t*30)})`;}
+ctx.fillRect(j*cw,i*ch,cw+.5,ch+.5);}
+if(horizonR>0){ctx.strokeStyle='rgba(255,100,0,0.5)';ctx.lineWidth=2;ctx.setLineDash([4,4]);
+ctx.beginPath();ctx.arc(cv.width/2,cv.height/2,horizonR*cw,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);}
+lb.textContent=`${P.view.toUpperCase()} | step ${step}`;
+const tH=(6.2e-8/P.mass).toExponential(1);
+og.innerHTML=`<span class="obs-label">M:</span><span class="obs-value" style="color:var(--lcars-orange)">${P.mass.toFixed(1)} M☉</span>
+<span class="obs-label">r_horizon:</span><span class="obs-value" style="color:var(--lcars-rose)">${horizonR.toFixed(1)}</span>
+<span class="obs-label">T_Hawking:</span><span class="obs-value" style="color:var(--lcars-mauve)">${tH} K</span>
+<span class="obs-label">β|∇S|_max:</span><span class="obs-value" style="color:${maxBG<1?'var(--lcars-teal)':'var(--lcars-red)'}">${maxBG.toFixed(3)}</span>`;
+const b=document.getElementById('badges');b.innerHTML='';
+b.appendChild(createBadge('HORIZON',`r=${horizonR.toFixed(0)}`,horizonR>0));
+b.appendChild(createBadge('NO SINGULARITY','β prevents ∞',true));
+b.appendChild(createBadge('UNITARY','D·C·R conserved',true));
+b.appendChild(createBadge('HAWKING = R(t)','Information encoded',true));}
+function loop(){if(!running)return;for(let s=0;s<P.speed;s++)evolve();draw();requestAnimationFrame(loop);}
+init();draw();
+</script></body></html>

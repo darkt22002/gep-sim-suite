@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GEP Simulation Suite — LCARS Interface</title>
+<link rel="stylesheet" href="lcars-core.css">
+<script src="lcars-core.js"></script>
+</head>
+<body>
+<script>
+const main = buildLCARSFrame(null);
+
+// Equation banner
+const banner = document.createElement('div');
+banner.className = 'lcars-equation-banner';
+banner.innerHTML = `
+  <div class="eq">ΔS = D · C · R · (1 + αE − β‖∇S‖)</div>
+  <div class="eq-note">ONE EQUATION · EVERY SCALE · EVERY DOMAIN · β = 0.5</div>
+`;
+main.appendChild(banner);
+
+// Category label
+function addCatLabel(cat) {
+  const label = document.createElement('div');
+  label.style.cssText = `
+    font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase;
+    color: ${CAT_COLORS[cat]}; margin: 16px 8px 6px; padding-left: 8px;
+    border-left: 4px solid ${CAT_COLORS[cat]};
+  `;
+  label.textContent = CAT_NAMES[cat];
+  main.appendChild(label);
+}
+
+// Build sim cards grouped by category
+const catOrder = ['foundation', 'forces', 'cosmo', 'astro', 'applied', 'meta'];
+for (const cat of catOrder) {
+  const catSims = SIMS.filter(s => s.cat === cat);
+  if (catSims.length === 0) continue;
+  addCatLabel(cat);
+
+  const grid = document.createElement('div');
+  grid.className = 'lcars-index-grid';
+  for (const sim of catSims) {
+    const card = document.createElement('a');
+    card.href = sim.file;
+    card.className = 'lcars-sim-card';
+    card.dataset.cat = sim.cat;
+    card.innerHTML = `
+      <div class="card-num">${String(sim.id).padStart(2, '0')}</div>
+      <div class="card-title">${sim.title}</div>
+      <div class="card-physics">${sim.physics}</div>
+      <div class="card-section">${sim.section}</div>
+    `;
+    card.onclick = (e) => { lcarsBeep(1500, 0.08); };
+    grid.appendChild(card);
+  }
+  main.appendChild(grid);
+}
+
+// Stats footer
+const footer = document.createElement('div');
+footer.className = 'lcars-equation-banner';
+footer.style.marginTop = '20px';
+footer.innerHTML = `
+  <div style="display:flex; justify-content:center; gap:40px; flex-wrap:wrap;">
+    <div><span style="font-size:28px; color:var(--lcars-orange); font-weight:700;">14</span><br><span style="font-size:10px; color:#665533;">SIMULATIONS</span></div>
+    <div><span style="font-size:28px; color:var(--lcars-teal); font-weight:700;">242KB</span><br><span style="font-size:10px; color:#665533;">TOTAL CODE</span></div>
+    <div><span style="font-size:28px; color:var(--lcars-mauve); font-weight:700;">58</span><br><span style="font-size:10px; color:#665533;">PROOF PARTS</span></div>
+    <div><span style="font-size:28px; color:var(--lcars-periwinkle); font-weight:700;">120</span><br><span style="font-size:10px; color:#665533;">FALSIFICATION CONDITIONS</span></div>
+  </div>
+  <div style="font-size:10px; color:#443322; margin-top:12px; letter-spacing:0.1em;">
+    STARDATE ${stardate()} · ALL SIMULATIONS OPERATIONAL · LCARS INTERFACE ACTIVE
+  </div>
+`;
+main.appendChild(footer);
+
+// Stardate in bottom bar
+document.querySelector('.lcars-bottombar-main span:first-child').innerHTML +=
+  ` · STARDATE ${stardate()}`;
+</script>
+</body>
+</html>

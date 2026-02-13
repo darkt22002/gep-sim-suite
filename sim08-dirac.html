@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 08: Dirac Spinors — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(8);const N=80;
+let psiR,psiI,chiR,chiI,vpR,vpI,vcR,vcI,running=false,step=0;
+let P={beta:0.5,mass:0.3,coupling:0.1,speed:4,view:'density',initMode:'pair'};
+function init(){psiR=new Float64Array(N*N);psiI=new Float64Array(N*N);chiR=new Float64Array(N*N);chiI=new Float64Array(N*N);
+vpR=new Float64Array(N*N);vpI=new Float64Array(N*N);vcR=new Float64Array(N*N);vcI=new Float64Array(N*N);
+const cx=N/2,cy=N/2;
+if(P.initMode==='pair'){for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;
+const r1=Math.sqrt((i-cx+12)**2+(j-cy)**2);const r2=Math.sqrt((i-cx-12)**2+(j-cy)**2);
+psiR[k]=1.2*Math.exp(-r1*r1/20);psiI[k]=0.4*Math.exp(-r1*r1/20)*Math.sin(i*0.3);
+chiR[k]=-1.2*Math.exp(-r2*r2/20);chiI[k]=-0.4*Math.exp(-r2*r2/20)*Math.sin(i*0.3);}}
+else if(P.initMode==='single'){for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;
+const r=Math.sqrt((i-cx)**2+(j-cy)**2);psiR[k]=1.5*Math.exp(-r*r/30)*Math.cos(j*0.2);psiI[k]=1.5*Math.exp(-r*r/30)*Math.sin(j*0.2);}}
+else{const rng=((s)=>()=>{s=(s*16807)%2147483647;return s/2147483647;})(99);
+for(let k=0;k<N*N;k++){psiR[k]=0.02*(rng()-0.5);psiI[k]=0.02*(rng()-0.5);chiR[k]=0.02*(rng()-0.5);chiI[k]=0.02*(rng()-0.5);}}
+step=0;}
+function evolve(){const dt=0.006,{beta,mass,coupling}=P;
+const id=(i,j)=>((i+N)%N)*N+((j+N)%N);
+const npR=new Float64Array(N*N),npI=new Float64Array(N*N),ncR=new Float64Array(N*N),ncI=new Float64Array(N*N);
+const nvpR=new Float64Array(N*N),nvpI=new Float64Array(N*N),nvcR=new Float64Array(N*N),nvcI=new Float64Array(N*N);
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=id(i,j);
+const lPR=psiR[id(i+1,j)]+psiR[id(i-1,j)]+psiR[id(i,j+1)]+psiR[id(i,j-1)]-4*psiR[k];
+const lPI=psiI[id(i+1,j)]+psiI[id(i-1,j)]+psiI[id(i,j+1)]+psiI[id(i,j-1)]-4*psiI[k];
+const lCR=chiR[id(i+1,j)]+chiR[id(i-1,j)]+chiR[id(i,j+1)]+chiR[id(i,j-1)]-4*chiR[k];
+const lCI=chiI[id(i+1,j)]+chiI[id(i-1,j)]+chiI[id(i,j+1)]+chiI[id(i,j-1)]-4*chiI[k];
+const dpx=(psiR[id(i+1,j)]-psiR[id(i-1,j)])/2;const dpy=(psiR[id(i,j+1)]-psiR[id(i,j-1)])/2;
+const gP=Math.sqrt(dpx*dpx+dpy*dpy);const fP=Math.max(0,1-beta*beta*gP*gP);
+const dcx2=(chiR[id(i+1,j)]-chiR[id(i-1,j)])/2;const dcy2=(chiR[id(i,j+1)]-chiR[id(i,j-1)])/2;
+const gC=Math.sqrt(dcx2*dcx2+dcy2*dcy2);const fC=Math.max(0,1-beta*beta*gC*gC);
+nvpR[k]=vpR[k]+dt*(fP*lPR-mass*psiI[k]+coupling*chiR[k]-0.02*vpR[k]);
+nvpI[k]=vpI[k]+dt*(fP*lPI+mass*psiR[k]+coupling*chiI[k]-0.02*vpI[k]);
+nvcR[k]=vcR[k]+dt*(fC*lCR+mass*chiI[k]+coupling*psiR[k]-0.02*vcR[k]);
+nvcI[k]=vcI[k]+dt*(fC*lCI-mass*chiR[k]+coupling*psiI[k]-0.02*vcI[k]);
+npR[k]=psiR[k]+dt*nvpR[k];npI[k]=psiI[k]+dt*nvpI[k];ncR[k]=chiR[k]+dt*nvcR[k];ncI[k]=chiI[k]+dt*nvcI[k];}
+psiR=npR;psiI=npI;chiR=ncR;chiI=ncI;vpR=nvpR;vpI=nvpI;vcR=nvcR;vcI=nvcI;step++;}
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2>Dirac Spinors & QED</h2><div class="sim-subtitle">Gradient Orientation → Matter/Antimatter → UV Finite (No Renormalization)</div>';
+main.appendChild(hdr);const lay=document.createElement('div');lay.className='sim-layout';main.appendChild(lay);
+const ca=document.createElement('div');ca.className='sim-canvas-area';lay.appendChild(ca);
+const w1=document.createElement('div');w1.className='canvas-wrap';const cv=document.createElement('canvas');cv.width=400;cv.height=400;
+const lb=document.createElement('div');lb.className='canvas-label top-left';w1.appendChild(cv);w1.appendChild(lb);ca.appendChild(w1);
+const ct=document.createElement('div');ct.className='sim-controls';lay.appendChild(ct);
+const op=document.createElement('div');op.className='lcars-panel';op.innerHTML='<div class="lcars-panel-title">QED OBSERVABLES</div>';
+const og=document.createElement('div');og.className='lcars-obs-grid';og.id='obs';op.appendChild(og);ct.appendChild(op);
+const cp=document.createElement('div');cp.className='lcars-panel';cp.dataset.accent='rose';
+cp.innerHTML='<div class="lcars-panel-title">PARAMETERS</div>';ct.appendChild(cp);
+cp.appendChild(createSlider({label:'β',value:0.5,min:0.1,max:2,step:0.05,color:'gold',detail:'UV cutoff = 1/β',onChange:v=>P.beta=v}).group);
+cp.appendChild(createSlider({label:'Mass m',value:0.3,min:0,max:1.5,step:0.05,color:'rose',onChange:v=>P.mass=v}).group);
+cp.appendChild(createSlider({label:'ψ-χ coupling',value:0.1,min:0,max:0.5,step:0.01,color:'periwinkle',onChange:v=>P.coupling=v}).group);
+cp.appendChild(createSlider({label:'Speed',value:4,min:1,max:15,step:1,color:'teal',onChange:v=>P.speed=v}).group);
+const vl=document.createElement('div');vl.className='lcars-slider-label';vl.innerHTML='<span>View</span>';cp.appendChild(vl);
+cp.appendChild(createViewButtons(['density','spin','damping'],'density',m=>{P.view=m;draw();}));
+const vl2=document.createElement('div');vl2.className='lcars-slider-label';vl2.innerHTML='<span>Init</span>';vl2.style.marginTop='6px';cp.appendChild(vl2);
+cp.appendChild(createViewButtons(['pair','single','vacuum'],'pair',m=>{P.initMode=m;init();draw();}));
+const bg=document.createElement('div');bg.className='lcars-btn-group';bg.style.marginTop='8px';
+const rb=document.createElement('button');rb.className='lcars-btn lcars-btn-run';rb.textContent='▶ ENGAGE';
+rb.onclick=()=>{running=!running;rb.textContent=running?'⏸ STANDBY':'▶ ENGAGE';rb.className=`lcars-btn ${running?'lcars-btn-pause':'lcars-btn-run'}`;if(running)loop();};
+const rsb=document.createElement('button');rsb.className='lcars-btn lcars-btn-reset';rsb.textContent='↻ RESET';
+rsb.onclick=()=>{running=false;rb.textContent='▶ ENGAGE';rb.className='lcars-btn lcars-btn-run';init();draw();};
+bg.appendChild(rb);bg.appendChild(rsb);cp.appendChild(bg);
+ct.appendChild(Object.assign(document.createElement('div'),{className:'lcars-panel',innerHTML:'<div class="lcars-panel-title">PHYSICS</div><div class="lcars-derivation">Outward ∇S → <span class="result">particle</span> (ψ)<br>Inward ∇S → <span class="result">antiparticle</span> (χ)<br>Overlap → gradients cancel → <span class="key">annihilation</span><br>β damps propagator at k > 1/β<br>→ <span class="result">UV FINITE</span> — no renormalization<br>Path integral: sum over entropy paths<br>→ Feynman diagrams emerge</div>'}));
+const bd=document.createElement('div');bd.className='lcars-badges';bd.id='badges';ct.appendChild(bd);
+let initNorm=1;
+function draw(){const ctx=cv.getContext('2d');const cw=cv.width/N,ch=cv.height/N;let pN=0,cN=0,ov=0,mBG=0;
+for(let i=0;i<N;i++)for(let j=0;j<N;j++){const k=i*N+j;
+const pA=Math.sqrt(psiR[k]**2+psiI[k]**2);const cA=Math.sqrt(chiR[k]**2+chiI[k]**2);
+pN+=pA*pA;cN+=cA*cA;ov+=pA*cA;
+const dpx=(psiR[((i+1)%N)*N+j]-psiR[((i-1+N)%N)*N+j])/2;const dpy=(psiR[i*N+(j+1)%N]-psiR[i*N+(j-1+N)%N])/2;
+const bg2=P.beta*Math.sqrt(dpx*dpx+dpy*dpy);if(bg2>mBG)mBG=bg2;
+if(P.view==='density'){const pI=Math.min(1,pA*2),cI=Math.min(1,cA*2),mix=Math.min(pI,cI);
+ctx.fillStyle=`rgb(${Math.min(255,~~((cI-mix*.5)*255+mix*200))},${Math.min(255,~~(mix*200+20))},${Math.min(255,~~((pI-mix*.5)*255+mix*200))})`;}
+else if(P.view==='spin'){const phase=Math.atan2(psiI[k],psiR[k]);const hue=((phase+Math.PI)/(2*Math.PI))*360;
+ctx.fillStyle=`hsl(${hue},70%,${Math.min(60,20+pA*80)}%)`;}
+else{const fD=Math.max(0,1-P.beta**2*(dpx*dpx+dpy*dpy));ctx.fillStyle=`rgb(${~~((1-fD)*255)},${~~(fD*200)},${~~(40+fD*60)})`;}
+ctx.fillRect(j*cw,i*ch,cw+.5,ch+.5);}
+const tot=N*N;if(initNorm===1&&(pN+cN)>0.1)initNorm=pN+cN;const annPct=Math.max(0,1-(pN+cN)/(initNorm+.001));
+lb.textContent=`${P.view.toUpperCase()} | step ${step}`;
+og.innerHTML=`<span class="obs-label">|ψ|²:</span><span class="obs-value" style="color:var(--lcars-periwinkle)">${(pN/tot).toFixed(3)}</span>
+<span class="obs-label">|χ|²:</span><span class="obs-value" style="color:var(--lcars-red)">${(cN/tot).toFixed(3)}</span>
+<span class="obs-label">⟨ψ|χ⟩:</span><span class="obs-value" style="color:var(--lcars-cream)">${(ov/tot).toFixed(4)}</span>
+<span class="obs-label">Annihilated:</span><span class="obs-value" style="color:var(--lcars-orange)">${(annPct*100).toFixed(1)}%</span>`;
+const b=document.getElementById('badges');b.innerHTML='';
+b.appendChild(createBadge('MATTER/ANTI','Gradient orientation ± → CPT',true));
+b.appendChild(createBadge('UV FINITE',`Cutoff 1/β = ${(1/P.beta).toFixed(1)}`,P.beta>0));
+b.appendChild(createBadge('MASS GAP',`m = ${P.mass.toFixed(2)}`,P.mass>0));
+b.appendChild(createBadge('ANNIHILATION',`${(annPct*100).toFixed(0)}% annihilated`,ov/tot>0.0001||P.initMode!=='pair'));}
+function loop(){if(!running)return;for(let s=0;s<P.speed;s++)evolve();draw();requestAnimationFrame(loop);}
+init();draw();
+</script></body></html>

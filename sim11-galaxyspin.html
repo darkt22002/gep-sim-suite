@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 11: Galaxy Spin — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(11);const PI2=Math.PI*2;
+let galaxies=[],P={z:0.5,nGal:200,highlightMass:10.5,showKerr:true,showFilament:true,showCS:true};
+const csAngle=3.65,parentSpin=2.1;
+function genGals(){const rng=((s)=>()=>{s=(s*16807)%2147483647;return s/2147483647;})(42);galaxies=[];
+for(let i=0;i<P.nGal;i++){const angle=rng()*PI2,dist=0.15+rng()*0.8,logMass=9+rng()*4;
+const kerrSpin=rng()*PI2,filDir=angle+0.3*Math.sin(angle*2),tidDir=filDir+(rng()-0.5)*0.8;
+const dCS=Math.abs(angle-csAngle),nearCS=dCS<0.4||dCS>(PI2-0.4);
+const kW=Math.min(1,Math.max(0,(logMass-10.5)/2)),tW=1-kW,csB=nearCS?0.3:0;
+const diskSpin=tW*tidDir+(kW+csB)*(nearCS?parentSpin:kerrSpin);
+const mis=Math.abs(diskSpin-filDir)%Math.PI;
+galaxies.push({x:Math.cos(angle)*dist,y:Math.sin(angle)*dist,angle,logMass,kerrSpin,filDir,tidDir,diskSpin,mis,nearCS});}}
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2>Galaxy Spin & Angular Momentum</h2><div class="sim-subtitle">Kerr Import → Mass-Dependent Misalignment → Cold Spot Correlation</div>';
+main.appendChild(hdr);const lay=document.createElement('div');lay.className='sim-layout';main.appendChild(lay);
+const ca=document.createElement('div');ca.className='sim-canvas-area';lay.appendChild(ca);
+const cv=document.createElement('canvas');cv.width=420;cv.height=420;cv.style.border='1px solid #332200';cv.style.borderRadius='4px';ca.appendChild(cv);
+const ct=document.createElement('div');ct.className='sim-controls';lay.appendChild(ct);
+const op=document.createElement('div');op.className='lcars-panel';op.innerHTML='<div class="lcars-panel-title">SPIN OBSERVABLES</div>';
+const og=document.createElement('div');og.className='lcars-obs-grid';og.id='obs';op.appendChild(og);ct.appendChild(op);
+const cp=document.createElement('div');cp.className='lcars-panel';cp.dataset.accent='mauve';
+cp.innerHTML='<div class="lcars-panel-title">PARAMETERS</div>';ct.appendChild(cp);
+cp.appendChild(createSlider({label:'Redshift z',value:0.5,min:0,max:8,step:0.1,color:'rose',onChange:v=>{P.z=v;draw();}}).group);
+cp.appendChild(createSlider({label:'Transition mass (log)',value:10.5,min:9.5,max:12,step:0.1,color:'gold',onChange:v=>{P.highlightMass=v;draw();}}).group);
+cp.appendChild(createSlider({label:'N galaxies',value:200,min:50,max:500,step:50,color:'periwinkle',onChange:v=>{P.nGal=v;genGals();draw();}}).group);
+const chks=document.createElement('div');chks.style.cssText='display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;';
+['Kerr','Filaments','Cold Spot'].forEach((n,i)=>{const l=document.createElement('label');l.className='lcars-checkbox';
+const inp=document.createElement('input');inp.type='checkbox';inp.checked=true;
+inp.onchange=e=>{['showKerr','showFilament','showCS'][i].split('.').reduce((o,k)=>o,P);
+if(i===0)P.showKerr=e.target.checked;if(i===1)P.showFilament=e.target.checked;if(i===2)P.showCS=e.target.checked;draw();};
+l.appendChild(inp);l.appendChild(document.createTextNode(' '+n));chks.appendChild(l);});
+cp.appendChild(chks);
+ct.appendChild(Object.assign(document.createElement('div'),{className:'lcars-panel',innerHTML:`<div class="lcars-panel-title">SPIN EVOLUTION</div><div class="lcars-derivation">
+<span style="color:var(--lcars-red)">t=0:</span> Anchors with parent Kerr<br>
+<span style="color:var(--lcars-orange)">z>6:</span> Galaxies form around anchors<br>
+<span style="color:var(--lcars-ice)">z~2:</span> Tidal torques align disks<br>
+Low-mass → aligned first<br>
+<span style="color:var(--lcars-teal)">z=0:</span> Massive still misaligned<br>
+→ <span style="color:var(--lcars-mauve)">Welker+ 2014 reversal</span></div>`}));
+const bd=document.createElement('div');bd.className='lcars-badges';bd.id='badges';ct.appendChild(bd);
+function draw(){const ctx=cv.getContext('2d');const W=cv.width,H=cv.height;const cx=W/2,cy=H/2,maxR=Math.min(W,H)*0.45;
+ctx.fillStyle='#050308';ctx.fillRect(0,0,W,H);
+ctx.strokeStyle='#221800';ctx.lineWidth=1;ctx.beginPath();ctx.arc(cx,cy,maxR,0,PI2);ctx.stroke();
+if(P.showCS){const csX=cx+Math.cos(csAngle)*maxR*0.85,csY=cy+Math.sin(csAngle)*maxR*0.85;
+const g=ctx.createRadialGradient(csX,csY,0,csX,csY,maxR*0.12);g.addColorStop(0,'rgba(40,60,200,0.4)');g.addColorStop(1,'rgba(0,0,0,0)');
+ctx.fillStyle=g;ctx.beginPath();ctx.arc(csX,csY,maxR*0.12,0,PI2);ctx.fill();
+ctx.fillStyle='rgba(100,150,255,0.5)';ctx.font='8px Antonio,sans-serif';ctx.fillText('COLD SPOT',csX-22,csY+maxR*0.12+10);}
+if(P.showFilament){ctx.strokeStyle='rgba(100,80,60,0.12)';ctx.lineWidth=6;
+for(let a=0;a<PI2;a+=0.8){ctx.beginPath();for(let r=0.1;r<1;r+=0.02){const x=cx+Math.cos(a+0.3*Math.sin(a*2))*r*maxR,y=cy+Math.sin(a+0.3*Math.sin(a*2))*r*maxR;r<0.12?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.stroke();}}
+let hMis=0,lMis=0,hC=0,lC=0;
+for(const g of galaxies){const gx=cx+g.x*maxR,gy=cy+g.y*maxR;const sz=2+(g.logMass-9)*1.2;
+const zF=Math.min(1,P.z*1.5);const isH=g.logMass>P.highlightMass;const al=g.nearCS&&P.showCS?0.9:0.6;
+ctx.fillStyle=isH?`rgba(255,${~~(80+(1-zF)*175)},${~~(40+(1-zF)*60)},${al})`:`rgba(${~~(40+zF*60)},${~~(120+(1-zF)*100)},255,${al})`;
+ctx.beginPath();ctx.arc(gx,gy,sz,0,PI2);ctx.fill();
+const sLen=sz*2.5,eSpin=g.tidDir*(1-zF*Math.min(1,(g.logMass-10)/2))+g.kerrSpin*zF*Math.min(1,(g.logMass-10)/2);
+ctx.strokeStyle=isH?`rgba(255,100,100,${0.3+zF*0.3})`:`rgba(100,180,255,${0.2+(1-zF)*0.2})`;ctx.lineWidth=0.8;
+ctx.beginPath();ctx.moveTo(gx,gy);ctx.lineTo(gx+Math.cos(eSpin)*sLen,gy+Math.sin(eSpin)*sLen);ctx.stroke();
+if(isH){hMis+=g.mis;hC++;}else{lMis+=g.mis;lC++;}}
+const avgH=hC>0?hMis/hC:0,avgL=lC>0?lMis/lC:0,csG=galaxies.filter(g=>g.nearCS).length;
+ctx.fillStyle='rgba(120,130,150,0.6)';ctx.font='8px Antonio,sans-serif';
+ctx.fillText(`z=${P.z.toFixed(1)} | ${P.nGal} galaxies`,10,14);
+og.innerHTML=`<span class="obs-label">High-M mis:</span><span class="obs-value" style="color:var(--lcars-orange)">${(avgH*180/Math.PI).toFixed(1)}°</span>
+<span class="obs-label">Low-M mis:</span><span class="obs-value" style="color:var(--lcars-ice)">${(avgL*180/Math.PI).toFixed(1)}°</span>
+<span class="obs-label">Near CS:</span><span class="obs-value" style="color:var(--lcars-mauve)">${csG}</span>`;
+const b=document.getElementById('badges');b.innerHTML='';
+b.appendChild(createBadge('KERR IMPORT','SMBH spin from parent',true));
+b.appendChild(createBadge('MASS TRANSITION',`~10^${P.highlightMass.toFixed(1)}`,true));
+b.appendChild(createBadge('z-DEPENDENT','Misalignment ↑ with z',true));
+b.appendChild(createBadge('COLD SPOT SPIN','Preferred direction',P.showCS));}
+genGals();draw();
+</script></body></html>

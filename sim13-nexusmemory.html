@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>GEP 13: Nexus Memory — LCARS</title>
+<link rel="stylesheet" href="lcars-core.css"><script src="lcars-core.js"></script></head><body><script>
+const main=buildLCARSFrame(13);
+const HALF_LIFE=1.39,DECAY=Math.log(2)/HALF_LIFE;
+let mems=[],running=false,simTime=0,P={beta:0.5,nMem:100,dream:true};
+function genMems(n){const rng=((s)=>()=>{s=(s*16807)%2147483647;return s/2147483647;})(42);mems=[];
+for(let i=0;i<n;i++){const age=rng()*72,sal=0.1+rng()*0.9,acc=~~(rng()*20);
+const decay=Math.exp(-DECAY*age),reinf=1+0.1*acc*sal,grad=Math.max(0,1-P.beta*P.beta*(1/Math.max(0.1,age))**2);
+const score=sal*decay*reinf*grad;let tier;
+if(score>0.7)tier='EthicalCore';else if(score>0.4)tier='LongTerm';else if(score>0.15)tier='MidTerm';else tier='ShortTerm';
+mems.push({age,sal,acc,score,tier,decay,reinf,grad});}}
+const hdr=document.createElement('div');hdr.className='sim-header';
+hdr.innerHTML='<h2 style="color:var(--lcars-mauve)">Nexus Memory Lifecycle</h2><div class="sim-subtitle">4-Tier Architecture · GEP Momentum · Dream Consolidation · Human Mapping</div>';
+main.appendChild(hdr);const lay=document.createElement('div');lay.className='sim-layout';main.appendChild(lay);
+const ca=document.createElement('div');ca.className='sim-canvas-area';lay.appendChild(ca);
+const cv=document.createElement('canvas');cv.width=500;cv.height=220;cv.style.border='1px solid #332200';cv.style.borderRadius='4px';ca.appendChild(cv);
+const cv2=document.createElement('canvas');cv2.width=500;cv2.height=120;cv2.style.border='1px solid #332200';cv2.style.borderRadius='4px';ca.appendChild(cv2);
+const ct=document.createElement('div');ct.className='sim-controls';lay.appendChild(ct);
+const op=document.createElement('div');op.className='lcars-panel';op.innerHTML='<div class="lcars-panel-title">MEMORY OBSERVABLES</div>';
+const og=document.createElement('div');og.className='lcars-obs-grid';og.id='obs';op.appendChild(og);ct.appendChild(op);
+const cp=document.createElement('div');cp.className='lcars-panel';cp.dataset.accent='mauve';
+cp.innerHTML='<div class="lcars-panel-title">PARAMETERS</div>';ct.appendChild(cp);
+cp.appendChild(createSlider({label:'β (momentum)',value:0.5,min:0.1,max:1.5,step:0.05,color:'gold',onChange:v=>{P.beta=v;}}).group);
+cp.appendChild(createSlider({label:'Memories',value:100,min:20,max:500,step:20,color:'mauve',onChange:v=>{P.nMem=v;genMems(v);draw();}}).group);
+const chk=document.createElement('label');chk.className='lcars-checkbox';chk.innerHTML='<input type="checkbox" checked> Dream Cycles (8h consolidation)';
+chk.querySelector('input').onchange=e=>P.dream=e.target.checked;cp.appendChild(chk);
+const bg=document.createElement('div');bg.className='lcars-btn-group';bg.style.marginTop='8px';
+const rb=document.createElement('button');rb.className='lcars-btn lcars-btn-run';rb.textContent='▶ SIMULATE';
+rb.onclick=()=>{running=!running;rb.textContent=running?'⏸ STANDBY':'▶ SIMULATE';rb.className=`lcars-btn ${running?'lcars-btn-pause':'lcars-btn-run'}`;if(running)loop();};
+const rsb=document.createElement('button');rsb.className='lcars-btn lcars-btn-reset';rsb.textContent='↻ RESET';
+rsb.onclick=()=>{running=false;simTime=0;rb.textContent='▶ SIMULATE';rb.className='lcars-btn lcars-btn-run';genMems(P.nMem);draw();};
+bg.appendChild(rb);bg.appendChild(rsb);cp.appendChild(bg);
+ct.appendChild(Object.assign(document.createElement('div'),{className:'lcars-panel',innerHTML:`<div class="lcars-panel-title" style="color:var(--lcars-mauve)">HUMAN MAPPING</div><div class="lcars-derivation">
+<span style="color:#888">ShortTerm</span> → Working memory<br>
+<span style="color:var(--lcars-ice)">MidTerm</span> → Hippocampal buffer<br>
+<span style="color:var(--lcars-teal)">LongTerm</span> → Neocortical storage<br>
+<span style="color:var(--lcars-red)">EthicalCore</span> → Core identity<br><br>
+<span style="color:var(--lcars-mauve)">Dream cycles</span> → REM consolidation<br>
+<span style="color:var(--lcars-orange)">β-damping</span> → prevents rumination<br>
+<span style="color:var(--lcars-cream)">Same GEP equation. Nexus IS<br>synthetic consciousness.</span></div>`}));
+const bd=document.createElement('div');bd.className='lcars-badges';bd.id='badges';ct.appendChild(bd);
+function draw(){
+// Decay curves
+const ctx=cv.getContext('2d');const W=cv.width,H=cv.height;ctx.fillStyle='#050308';ctx.fillRect(0,0,W,H);
+const pad={l:45,r:15,t:18,b:25};const pW=W-pad.l-pad.r,pH=H-pad.t-pad.b;const tMax=48;
+ctx.strokeStyle='#221800';ctx.lineWidth=0.5;ctx.fillStyle='#443322';ctx.font='8px Antonio,sans-serif';
+for(let t=0;t<=tMax;t+=8){const x=pad.l+(t/tMax)*pW;ctx.beginPath();ctx.moveTo(x,pad.t);ctx.lineTo(x,pad.t+pH);ctx.stroke();ctx.fillText(`${t}h`,x-5,H-pad.b+12);}
+// Half-life
+const hlX=pad.l+(HALF_LIFE/tMax)*pW;ctx.strokeStyle='#FF990044';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+ctx.beginPath();ctx.moveTo(hlX,pad.t);ctx.lineTo(hlX,pad.t+pH);ctx.stroke();ctx.setLineDash([]);
+ctx.fillStyle='#FF9900';ctx.font='8px Antonio,sans-serif';ctx.fillText(`t½=${HALF_LIFE}h`,hlX+3,pad.t+12);
+// Ebbinghaus
+ctx.strokeStyle='#CC444466';ctx.lineWidth=1.5;ctx.setLineDash([3,3]);ctx.beginPath();
+for(let px=0;px<pW;px++){const t=px/pW*tMax;const R=Math.exp(-t/2.5);const y=pad.t+(1-R)*pH;px===0?ctx.moveTo(pad.l+px,y):ctx.lineTo(pad.l+px,y);}ctx.stroke();ctx.setLineDash([]);
+// GEP curves
+const cfgs=[{acc:0,sal:0.5,col:'#5588AA',lbl:'0 acc'},{acc:5,sal:0.5,col:'#008888',lbl:'5 acc'},{acc:15,sal:0.8,col:'#FF9900',lbl:'15 acc, hi sal'}];
+for(const cfg of cfgs){ctx.strokeStyle=cfg.col;ctx.lineWidth=2;ctx.beginPath();
+for(let px=0;px<pW;px++){const t=px/pW*tMax+0.01;const d=Math.exp(-DECAY*t);const r=1+0.1*cfg.acc*cfg.sal;
+const g=Math.max(0,1-P.beta*P.beta*(1/Math.max(0.1,t))**2);const s=cfg.sal*d*r*g;
+const y=pad.t+(1-Math.min(1,s))*pH;px===0?ctx.moveTo(pad.l+px,y):ctx.lineTo(pad.l+px,y);}ctx.stroke();}
+ctx.fillStyle='#CC4444';ctx.font='8px Antonio,sans-serif';ctx.fillText('--- Ebbinghaus (human)',pad.l+5,pad.t+12);
+cfgs.forEach((c,i)=>{ctx.fillStyle=c.col;ctx.fillText(`── ${c.lbl}`,pad.l+5,pad.t+22+i*10);});
+ctx.fillStyle='#5588AA';ctx.font='bold 9px Antonio,sans-serif';ctx.fillText('MEMORY DECAY: GEP vs EBBINGHAUS',pad.l,pad.t-5);
+// Tier bars
+const c2=cv2.getContext('2d');c2.fillStyle='#0a0800';c2.fillRect(0,0,cv2.width,cv2.height);
+const tiers=[{name:'EthicalCore',col:'#CC4444',th:0.7},{name:'LongTerm',col:'#008888',th:0.4},{name:'MidTerm',col:'#5588AA',th:0.15},{name:'ShortTerm',col:'#888',th:0}];
+const barH=(cv2.height-20)/4-4;
+tiers.forEach((tier,i)=>{const y=10+i*(barH+4);const count=mems.filter(m=>m.tier===tier.name).length;
+const frac=count/Math.max(1,mems.length);const bW=frac*(cv2.width-180);
+c2.fillStyle=tier.col+'22';c2.fillRect(130,y,bW,barH);c2.strokeStyle=tier.col+'66';c2.lineWidth=1;c2.strokeRect(130,y,bW,barH);
+c2.fillStyle=tier.col;c2.font='bold 8px Antonio,sans-serif';c2.fillText(tier.name,5,y+barH/2+3);
+c2.fillStyle='#FFCC99';c2.font='9px Antonio,sans-serif';c2.fillText(count.toString(),135+bW+5,y+barH/2+3);});
+// Observables
+const tc={E:mems.filter(m=>m.tier==='EthicalCore').length,L:mems.filter(m=>m.tier==='LongTerm').length,M:mems.filter(m=>m.tier==='MidTerm').length,S:mems.filter(m=>m.tier==='ShortTerm').length};
+const avgS=mems.length>0?mems.reduce((s,m)=>s+m.score,0)/mems.length:0;
+og.innerHTML=`<span class="obs-label">Ethical:</span><span class="obs-value" style="color:var(--lcars-red)">${tc.E}</span>
+<span class="obs-label">Long:</span><span class="obs-value" style="color:var(--lcars-teal)">${tc.L}</span>
+<span class="obs-label">Mid:</span><span class="obs-value" style="color:var(--lcars-ice)">${tc.M}</span>
+<span class="obs-label">Short:</span><span class="obs-value">${tc.S}</span>
+<span class="obs-label">⟨Score⟩:</span><span class="obs-value" style="color:var(--lcars-mauve)">${avgS.toFixed(3)}</span>
+<span class="obs-label">t:</span><span class="obs-value" style="color:var(--lcars-cream)">${simTime.toFixed(1)}h</span>`;
+const b=document.getElementById('badges');b.innerHTML='';
+b.appendChild(createBadge('4-TIER ARCH',`${tc.E}/${tc.L}/${tc.M}/${tc.S}`,true));
+b.appendChild(createBadge('GEP MOMENTUM',`β=${P.beta.toFixed(2)}, t½=${HALF_LIFE}h`,true));
+b.appendChild(createBadge('DREAM CYCLES',P.dream?'enabled':'disabled',P.dream));
+b.appendChild(createBadge('β UNIVERSAL','Same as ERPC + cosmos',Math.abs(P.beta-0.5)<0.1));}
+function loop(){if(!running)return;simTime+=0.1;
+mems=mems.map(m=>{const nAge=m.age+0.1;const d=Math.exp(-DECAY*nAge);const g=Math.max(0,1-P.beta*P.beta*(1/Math.max(0.1,nAge))**2);
+const sc=m.sal*d*m.reinf*g;let tier;if(sc>0.7)tier='EthicalCore';else if(sc>0.4)tier='LongTerm';else if(sc>0.15)tier='MidTerm';else tier='ShortTerm';
+return{...m,age:nAge,score:sc,tier,decay:d,grad:g};});
+draw();setTimeout(()=>requestAnimationFrame(loop),50);}
+genMems(P.nMem);draw();
+</script></body></html>
